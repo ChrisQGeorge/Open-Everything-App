@@ -5,12 +5,12 @@ services:
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: mongoadmin
+      MONGO_INITDB_ROOT_PASSWORD: CHANGEME
       MONGO_INITDB_DATABASE: MongoDB
     volumes:
       - db-data:/data/db
     networks:
-      - app-network
+      - app-net
     ports:
       - "27017:27017"
 
@@ -18,8 +18,10 @@ services:
     build: ./api
     depends_on:
       - db
-    ports:
-      - "8000:8000"
+    environment:
+      MONGO_USERNAME: root
+      MONGO_PASSWORD: CHANGEME
+      MONGO_DBNAME: MongoDB
     networks:
       - app-net
 
@@ -31,15 +33,9 @@ services:
       - api
     networks:
       - app-net
-
-  mongo-express:
-    image: mongo-express
-    ports:
-      - 8081:8081
-    environment:
-      - MONGO_HOST: db
-      - MONGO_PORT: 27017
-    networks:
-      app-net
+    
 networks:
   app-net:
+
+volumes:
+  db-data:
