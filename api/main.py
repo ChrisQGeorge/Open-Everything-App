@@ -8,23 +8,35 @@ mongo_username = os.environ.get('MONGO_USERNAME')
 mongo_password = os.environ.get('MONGO_PASSWORD')
 mongo_dbname = os.environ.get('MONGO_DBNAME')
 
-client = MongoClient("mongodb://"+mongo_username+":"+mongo_password+"@db:27017/admin)")
-db = client[mongo_dbname]
-collection = db["data"]
+try:
+    client = MongoClient(f"mongodb://{mongo_username}:{mongo_password}@db:27017/{mongo_dbname}")
+    db = client[mongo_dbname]
+    collection = db["data"]
+except:
+    pass
 
 try:
     res = collection.find_one({"_id": 1})
+
+    if not res:
+        collection.insert_one(
+            { "_id": 1, "data":"Hello world from MongoDB!"}
+        )
 except:
-    collection.insert_one(
-         { "_id": 1, "data":"Hello world from MongoDB!"}
-    )
+    pass
 
 
 
 
 @app.route('/')
 def hello_world():
-    data = collection.find_one({"_id": 1})
+    data = {}
+    try:
+        data = collection.find_one({"_id": 1})
+    except:
+        pass
+    if not data:
+        data = {'data':'ERROR'}
     return {'message':data["data"]}
 
 if __name__ == '__main__':

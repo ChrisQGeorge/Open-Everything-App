@@ -2,7 +2,6 @@ version: '3.8'
 services:
   db:
     image: mongo
-    restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: CHANGEME
@@ -11,8 +10,6 @@ services:
       - db-data:/data/db
     networks:
       - app-net
-    ports:
-      - "27017:27017"
 
   api:
     build: ./api
@@ -21,7 +18,7 @@ services:
     environment:
       MONGO_USERNAME: root
       MONGO_PASSWORD: CHANGEME
-      MONGO_DBNAME: MongoDB
+      MONGO_DBNAME: admin
     networks:
       - app-net
 
