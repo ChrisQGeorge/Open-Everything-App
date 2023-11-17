@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  db:
+    image: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: CHANGEME
+      MONGO_INITDB_DATABASE: MongoDB
+    volumes:
+      - db-data:/data/db
+    networks:
+      - app-net
+
+  api:
+    build: ./api
+    depends_on:
+      - db
+    environment:
+      MONGO_USERNAME: root
+      MONGO_PASSWORD: CHANGEME
+      MONGO_DBNAME: admin
+    networks:
+      - app-net
+
+  web:
+    build: ./app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - app-net
+    
+networks:
+  app-net:
+
+volumes:
+  db-data:
