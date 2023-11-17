@@ -17,8 +17,10 @@ services:
       - db
     environment:
       MONGO_USERNAME: root
-      MONGO_PASSWORD: CHANGEME
-      MONGO_DBNAME: admin
+      ROOT_MONGO_PASSWORD: CHANGEME
+      MONGO_DBNAME: MongoDB
+    ports:
+      - "5000:5000"
     networks:
       - app-net
 

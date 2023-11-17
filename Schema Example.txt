@@ -1,0 +1,35 @@
+User Document db/users
+{
+    _id:int,
+    username:string,
+    email:string,
+    password_hash:string,
+    profile_image:binary,
+    attributes[
+        weight,
+        running time,
+        ...
+        custom attribute 1,
+        custom attribute 2
+        ...
+        custom attribute n
+    ],
+    settings[
+        ...
+    ],
+    ...
+}
+
+Data document, where user attribute data is stored db/data
+data{
+    _id:int,
+    user_id:int,
+    attribute_name:string,
+    datapoint: int, string, bool, float,
+    timedate: timestamp
+}
+Example
+[
+    {_id:1234, attribute_name: weight, user_id: user1234, datapoint: 180, timestamp: 11/25/2023 12.59.59}
+    ...
+]
