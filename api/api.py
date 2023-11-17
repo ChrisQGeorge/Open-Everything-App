@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from passlib.context import CryptContext
 from authlib.jose import jwt
 from datetime import datetime, timedelta
-import json
+import secrets
+
 firstTimeStartup = True
 
 #-----App Setup-----#
@@ -18,8 +19,11 @@ app = FastAPI()
 
 #Restrict IP's to internal docker containers
 origins = [
-    "http://172.*.*.*:3000",
-    "172.*.*.*:3000"
+    "https://web:3000",
+    "https://db:3000",
+    "web:3000",
+    "db:3000",
+    "0.0.0.0"
 ]
 
 app.add_middleware(
@@ -67,7 +71,7 @@ async def configure_db_and_routes():
 # https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
 
 #Should generate new JWT token on runtime rather than having to store token in an open source repo
-SECRET_KEY = str(uuid4())
+SECRET_KEY = secrets.token_urlsafe(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -182,7 +186,6 @@ async def read_users_me(
     current_user: Annotated[User, Depends(get_current_active_user)]
 ):
     return current_user
-
 
 @app.get("/")
 async def read_root(token: Annotated[str, Depends(get_current_active_user)]):
