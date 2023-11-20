@@ -1,6 +1,5 @@
 from typing import Annotated
 import os
-from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -19,11 +18,10 @@ app = FastAPI()
 
 #Restrict IP's to internal docker containers
 origins = [
-    "https://web:3000",
-    "https://db:3000",
-    "web:3000",
-    "db:3000",
-    "0.0.0.0"
+    "https://web:5000",
+    "https://db:5000",
+    "web:5000",
+    "db:5000",
 ]
 
 app.add_middleware(
@@ -70,7 +68,7 @@ async def configure_db_and_routes():
 # https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
 # https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
 
-#Should generate new JWT token on runtime rather than having to store token in an open source repo
+#Should generate new JWT token on runtime rather than having to store the token in an open source repo
 SECRET_KEY = secrets.token_urlsafe(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
