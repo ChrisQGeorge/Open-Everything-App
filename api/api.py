@@ -10,7 +10,7 @@ from authlib.jose import jwt
 from datetime import datetime, timedelta
 import secrets
 
-firstTimeStartup = True
+firstTimeStartup = False
 
 #-----App Setup-----#
 app = FastAPI()
@@ -22,6 +22,7 @@ origins = [
     "https://db:5000",
     "web:5000",
     "db:5000",
+    "0.0.0.0"
 ]
 
 app.add_middleware(
@@ -136,6 +137,15 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    #setup_redirect= HTTPException(status_code=307,
+    #    detail="App is not setup. Redirect to setup",
+    #    headers={"WWW-Authenticate": "Bearer"},                  
+    #)
+
+    #if firstTimeStartup:
+    #    raise setup_redirect
+
     try:
         payload = jwt.decode(token, SECRET_KEY)
         username: str = payload.get("sub")
@@ -179,10 +189,8 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/users/me/", response_model=User)
-async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_active_user)]
-):
+@app.get("/users/me", response_model=User)
+async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
     return current_user
 
 @app.get("/")

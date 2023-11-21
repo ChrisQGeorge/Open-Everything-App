@@ -19,8 +19,6 @@ services:
       MONGO_USERNAME: root
       ROOT_MONGO_PASSWORD: CHANGEME
       MONGO_DBNAME: MongoDB
-    ports:
-      - "5000:5000"
     networks:
       - app-net
 
