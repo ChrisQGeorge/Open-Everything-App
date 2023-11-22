@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router'; // Import useRouter
+import Cookie from 'js-cookie';
 
 export default function Home() {
     const [message, setMessage] = useState("");
@@ -8,23 +9,35 @@ export default function Home() {
     const router = useRouter(); // Initialize useRouter
 
 
+
     useEffect(() => {
-        fetch('/api/')
+      const token = Cookie.get('token');
+      if (token) {
+          fetch('/api/users/me/', {
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              }
+          })
           .then(res => {
             const status = res.status;
             return res.json().then(data => ({
                 status: status,
                 data: data
-            }));
-        }).then(result => {
-            setMessage(result.data.message);
-            setLoading(false);
-            setStatus(result.status); // Update the status state
-        }).catch(error => {
-            console.error('Error fetching data:', error);
-            setLoading(false);
-        });
-    }, []);
+            }))
+          })
+            .then(result=> {
+              if (result.data && result.data.username) {
+                  setLoading(false);
+                  setStatus(result.status)
+              }
+          })
+          .catch(error => {
+              console.error('Error fetching data:', error);
+              setLoading(false);
+          });
+      }
+  }, [router]);
+
 
     useEffect(() => {
         // Redirect if the status is 403
