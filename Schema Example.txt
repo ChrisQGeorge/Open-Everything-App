@@ -25,11 +25,13 @@ data{
     _id:int,
     user_id:int,
     attribute_name:string,
-    datapoint: int, string, bool, float,
-    timedate: timestamp
+    datapoints: [[index: int, timestamp: timestamp, datapoint: int, string, bool, float] ... [index n: int, timestamp: timestamp, datapoint: int, string, bool, float]],
+    datapointNo: int,
+    startTimeDate: timestamp,
+    endTimeDate: timestamp
 }
 Example
 [
-    {_id:1234, attribute_name: weight, user_id: user1234, datapoint: 180, timestamp: 11/25/2023 12.59.59}
+    {_id:1234, user_id: user1234, attribute_name: weight, datapoint: [[1, 10/11/2023 11.30.00, 180] ... [n, 11/11/2023 15.00.00, 160 ]], n,  startTimeDate: 10/11/2023 11.30.00, endTimeDate: 11/11/2023 15.00.00}
     ...
 ]
