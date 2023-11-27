@@ -26,10 +26,8 @@ export default function Home() {
             }))
           })
             .then(result=> {
-              if (result.data && result.data.username) {
-                  setLoading(false);
-                  setStatus(result.status)
-              }
+              setLoading(false);
+              setStatus(result.status)
           })
           .catch(error => {
               console.error('Error fetching data:', error);
@@ -40,14 +38,19 @@ export default function Home() {
 
 
     useEffect(() => {
-        // Redirect if the status is 403
-        if (status === 403 || status === 401) {
-            router.push('/login'); // Use router.push for redirection
+        if (!loading) {
+            if (status >= 400 && status < 600) {
+                router.push('/login');
+            } else if (status >= 300 && status < 400) {
+                router.push('/setup');
+            } else if (status >= 200 && status < 300) {
+                router.push('/dashboard');
+            }
         }
-    }, [status, router]); // Add status and router to the dependency array
+    }, [status, loading, router]);
   return (
-      <div>
+    <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
         <p> {!loading ? message : "Loading.."}</p>
-      </div>
+    </div>
   )
 }

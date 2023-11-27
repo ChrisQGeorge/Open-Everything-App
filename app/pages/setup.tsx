@@ -1,46 +1,71 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 
-export default function Login() {
-    const [password, setPassword] = useState('');
-    const [status, setStatus] = useState(100)
-    const router = useRouter();
+export default function Setup() {
+    const [loading, setLoading] = useState(true);
+    const [content, setContent] = useState(``);
+    const [password, setPassword] = useState("")
+    const [firstTimeStartup, setFirstTimeStartup] = useState(false);
+    const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
+    const router = useRouter(); // Initialize useRouter
+    const [errorMessage, setError] = useState('');
+
+
 
     useEffect(() => {
-        fetch('/api/users/me/')
-          .then(res => {
-            const status = res.status;
-            return res.json().then(data => ({
-                status: status,
-                data: data
-            }));
-        }).then(result => {
-            setStatus(result.status); // Update the status state
-        }).catch(error => {
-            console.error('Error fetching data:', error);
+        fetch('/setup/firstTimeStartup')
+        .then(res => {
+        const status = res.status;
+        return res.json().then(data => ({
+            status: status,
+            data: data
+        }))
+        })
+        .then(result=> {
+            if (result.data === false) {
+                setLoading(false);
+                setStatus(result.status)
+                throw new Error('Internal Server Error');
+            }else{
+                setFirstTimeStartup(true)
+            }
+        })
+        .catch(error => {
+            setLoading(false);
+            setStatus(400)
+            throw new Error('Internal Server Error');
         });
-    }, []);
+  }, []);
 
-    if(status/ 100 == 2){
-        router.push('/dashboard')
-    }else if(status == 307){
-        router.push
-    }
+  const handleSubmit = async (event: { preventDefault: () => void; }) => {
+        event.preventDefault(); // Prevent the default form submission
 
+        const response = await fetch('/api/setup/setRoot', {
+            body: `password=${encodeURIComponent(password)}`,
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            method: "POST",
+        });
 
-    const handleSubmit = async (event: { preventDefault: () => void; }) => {
-        event.preventDefault();
-        // Implement your login logic here
-        console.log('Saved Pass:', password);
-        // On successful login, redirect or handle the response
-        // router.push('/dashboard'); // Redirect to dashboard or relevant page
+        if(response.ok){
+            const data = await response.json();
+            router.push('/login'); // Use router.push to navigate
+        } else {
+            setError("Error: Failed to set root password");
+        }
     };
 
-    return (
+
+  
+
+  if (firstTimeStartup === true){
+    return(
         <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
             <div className="px-8 py-6 text-left bg-white shadow-lg">
                 <h3 className="text-2xl font-bold text-center">Please select a root database password</h3>
-                <h3 className="text-lg font-bold text-center">Save this password!!! You won`&apos;`t be able to persist changes over rebuilds otherwise!</h3>
+                <h3 className="text-lg font-bold text-center">Save this password!!! You won\`&apos;\`t be able to persist changes over rebuilds otherwise!</h3>
+                <h3 className="text-2xl font-bold text-center">{errorMessage}</h3>
                 <form onSubmit={handleSubmit}>
                     <div className="mt-4">
                         <label className="block" htmlFor="password">Password</label>
@@ -64,6 +89,11 @@ export default function Login() {
                     </div>
                 </form>
             </div>
-        </div>
-    );
+        </div>)
+  } else {
+    return( 
+        <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
+            <h1>ERROR: App already set up</h1>
+        </div>)
+  }
 }
