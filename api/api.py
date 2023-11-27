@@ -11,7 +11,12 @@ from datetime import datetime, timedelta
 import secrets
 from dotenv import load_dotenv
 
-firstTimeStartup = True
+notSetupError = HTTPException(
+        status_code = 399,
+        detail = "App not setup",
+        headers={"WWW-Authenticate": "Bearer"}, 
+    )
+
 
 #-----App Setup-----#
 app = FastAPI()
@@ -22,8 +27,7 @@ origins = [
     "https://web:5000",
     "https://db:5000",
     "web:5000",
-    "db:5000",
-    "0.0.0.0"
+    "db:5000"
 ]
 
 app.add_middleware(
@@ -35,55 +39,56 @@ app.add_middleware(
 )
 
 async def rebuild_db_users(root_pass):
-    root = db('admin','admin', 'root', root_pass)
+    root = db('admin','admin', 'root', root_pass, 'system.users')
     api_pass = secrets.token_urlsafe(16)
 
 
-
-    try:
-
-        root.db.command("createUser", "api_user",
-                        pwd=api_pass,
-                        roles=[{"role": "readWrite", "db": os.environ.get('MONGO_DBNAME')}])
-
-        # Writing to .env file
+    if root.collection.find({"user":"api_user"}):
         try:
-            with open('.env', 'a') as file:
-                file.write(f"API_USER_PASS={api_pass}\n")
-            print(f"Successfully wrote API_USER_PASS to .env")
-        except IOError as error:
-            print(f"An error occurred while writing to .env: {error}")
+            root.database.command("updateUser", "root", pwd=api_pass)
+        except Exception as e:
+            print(f"Error creating MongoDB user: {e}")
 
-    except Exception as e:
-        print(f"Error creating MongoDB user: {e}")
+    else:
+        try:
+            root.db.command("createUser", "api_user",
+                            pwd=api_pass,
+                            roles=[{"role": "readWrite", "db": os.environ.get('MONGO_DBNAME')}])
 
+        except Exception as e:
+            print(f"Error creating MongoDB user: {e}")
 
-
-
-
+    # Writing to .env file
+    try:
+        with open('.env', 'a') as file:
+            file.write(f"API_USER_PASS={api_pass}\n")
+        print(f"Successfully wrote API_USER_PASS to .env")
+    except IOError as error:
+        print(f"An error occurred while writing to .env: {error}")
 
 
 @app.on_event("startup")
 async def configure_db_and_routes():
     global rootClient
-    global firstTimeStartup
     global dataClient
     global userClient
+
+    os.environ["SETUP"] = "True"
+
     #Attempts to connect with default root pass. If successful, trigger root change pass screen. Should fail if not first time startup
     try:
-        rootClient = db('admin', 'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'))
+        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+        rootCleint.collection.find_one()
     except:
-        firstTimeStartup = False
+        os.environ["SETUP"] = "False"
 
-    if firstTimeStartup:
-        rebuild_db_users(os.environ.get('ROOT_MONGO_PASSWORD'))
+    if os.environ["SETUP"] == "True":
+        await rebuild_db_users(os.environ.get('ROOT_MONGO_PASSWORD'))
 
     load_dotenv()
 
-    dataClient = db('admin', os.environ.get('MONGO_DBNAME'), 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'data')
-    userClient = db('admin', os.environ.get('MONGO_DBNAME'), 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'users')
-    #dataClient = db(os.environ.get('MONGO_DBNAME'), os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'data')
-    #userClient = db(os.environ.get('MONGO_DBNAME'), os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'users')
+    dataClient = db(os.environ.get('MONGO_DBNAME'), os.environ.get('MONGO_DBNAME'), 'root', os.environ.get('API_USER_PASS'), 'data')
+    userClient = db(os.environ.get('MONGO_DBNAME'), os.environ.get('MONGO_DBNAME'), 'root', os.environ.get('API_USER_PASS'), 'users')
     userCol = userClient.collection
     dataCol = dataClient.collection
     print(userCol)
@@ -102,31 +107,30 @@ async def configure_db_and_routes():
                 "_id":1,
                 "username":"test",
                 'password_hash':get_password_hash("test"),
-                'disabled':False})
+                'disabled':False
+                })
     except:
         pass
     
 async def setup(root_password):
-    print(root_password)
-    global firstTimeStartup
-
-    try: 
-        rootClient.db.command("updateUser", "root", pwd=root_password)
-    except Exception as e:
-        return e
-    
     try:
-        rootClient = db('admin', 'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'))
+        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+        
+        rootClient.db.command("updateUser", "root", pwd=root_password)
+        
     except:
-        firstTimeStartup = False
+        print(os.environ["SETUP"])
+        os.environ["SETUP"] = "False"
 
-    
+    try:
+        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+        rootClient.collection.find_one()
+    except:
+        os.environ["SETUP"] = "False"
 
+    await rebuild_db_users(root_password)
 
     return True
-
-
-
 
 
 #-----Auth Setup-----#
@@ -162,11 +166,11 @@ class UserInDB(User):
     hashed_password: str
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+     return pwd_context.verify(plain_password.encode('utf-8'), hashed_password)
 
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    return pwd_context.hash(password.encode('utf-8'))
 
 
 def get_user(username: str):
@@ -197,19 +201,21 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    raiseError = True
+    try:
+        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+        rootClient.collection.find_one()
+    except:
+        raiseError = False
+        
+    if raiseError:
+        raise notSetupError
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
-    setup_redirect= HTTPException(status_code=307,
-        detail="App is not setup. Redirect to setup",
-        headers={"WWW-Authenticate": "Bearer"},                  
-    )
-
-    if firstTimeStartup:
-        raise setup_redirect
 
     try:
         payload = jwt.decode(token, SECRET_KEY)
@@ -239,6 +245,9 @@ async def get_current_active_user(
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ):
+
+    if os.environ["SETUP"] == "True":
+        return notSetupError
     
 
     user = authenticate_user(form_data.username, form_data.password)
@@ -260,20 +269,18 @@ async def read_users_me(current_user: Annotated[User, Depends(get_current_active
     return current_user
 
 @app.get("/setup/firstTimeStartup")
-async def setup():
-    return {'data':firstTimeStartup}
+async def setup_confirm():
+    return {'data':os.environ["SETUP"]}
     
 @app.post("/setup/setRoot")
-async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-    ):
-    if not firstTimeStartup:
+async def set_root_password(password: str = Form(...)):
+    if os.environ["SETUP"] != "True":
         raise HTTPException(
             status_code = 400,
             detail = "App already set up"
         )
     
-    setup(form_data.password)
+    await setup(password)
 
 @app.get("/")
 async def read_root(token: Annotated[str, Depends(get_current_active_user)]):

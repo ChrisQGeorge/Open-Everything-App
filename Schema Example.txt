@@ -5,6 +5,12 @@ User Document db/users
     email:string,
     password_hash:string,
     profile_image:binary,
+    roles:[
+        role1,
+        role2,
+        ...
+        roleN
+    ],
     attributes[
         weight,
         running time,
