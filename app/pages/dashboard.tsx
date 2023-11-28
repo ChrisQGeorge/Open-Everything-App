@@ -24,6 +24,8 @@ export default function Home() {
               router.push('/login');
           } else if (status === 399) {
               router.push('/setup');
+          } else if (status === 398) {
+              router.push('/rebuild');
           }
       }
   }, [status, loading, router]);

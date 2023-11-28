@@ -26,6 +26,8 @@ export default function Login() {
         if (!loading) {
             if (status === 399) {
                 router.push('/setup');
+            } else if (status === 398) {
+                router.push('/rebuild');
             } else if (status >= 200 && status < 300) {
                 router.push('/dashboard');
             }

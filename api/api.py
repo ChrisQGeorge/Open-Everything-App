@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Union
 import os
 from fastapi import Depends, FastAPI, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,95 +38,135 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+class ErrorResponse(BaseModel):
+    detail: str
+
 async def rebuild_db_users(root_pass):
-    root = db('admin','admin', 'root', root_pass, 'system.users')
+    global dataClient
+    global userClient
+    root = db()
+    await root.connect('admin','root', root_pass, 'system.users')
     api_pass = secrets.token_urlsafe(16)
+    
 
-
-    if root.collection.find({"user":"api_user"}):
-        try:
-            root.database.command("updateUser", "root", pwd=api_pass)
-        except Exception as e:
-            print(f"Error creating MongoDB user: {e}")
-
+    if root.passfail == True:
+        print("Database connected")
+        if root.collection.find_one({"user":"api_user"}):
+            print("user found:", root.collection.find_one({"user":"api_user"}))
+            root.client.admin.command("updateUser", "api_user", pwd=api_pass)
+        else:
+            print("user not found")
+            root.client.admin.command("createUser", "api_user",
+                pwd=api_pass,
+                roles=[{"role": "readWrite", "db": os.environ.get('MONGO_DBNAME')}])
     else:
-        try:
-            root.db.command("createUser", "api_user",
-                            pwd=api_pass,
-                            roles=[{"role": "readWrite", "db": os.environ.get('MONGO_DBNAME')}])
+        print("ERROR: no DB connection with root password given")
+        raise HTTPException(
+            status_code = 401,
+            detail = "Root password not correct",
+            headers={"WWW-Authenticate": "Bearer"}, 
+        )
+    os.environ["API_USER_PASS"] = api_pass
 
-        except Exception as e:
-            print(f"Error creating MongoDB user: {e}")
-
-    # Writing to .env file
-    try:
-        with open('.env', 'a') as file:
-            file.write(f"API_USER_PASS={api_pass}\n")
-        print(f"Successfully wrote API_USER_PASS to .env")
-    except IOError as error:
-        print(f"An error occurred while writing to .env: {error}")
-
+    dataClient = db()
+    userClient = db()
+    await dataClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'data')
+    await userClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'users')
 
 @app.on_event("startup")
 async def configure_db_and_routes():
-    global rootClient
     global dataClient
     global userClient
-
     os.environ["SETUP"] = "True"
 
     #Attempts to connect with default root pass. If successful, trigger root change pass screen. Should fail if not first time startup
-    try:
-        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
-        rootCleint.collection.find_one()
-    except:
+    rootClient = db()
+    await rootClient.connect('admin','root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+
+    if not rootClient.passfail:
         os.environ["SETUP"] = "False"
+        print("Not first time setup:")
+    else:
+        print("First Time Setup")
+
 
     if os.environ["SETUP"] == "True":
         await rebuild_db_users(os.environ.get('ROOT_MONGO_PASSWORD'))
 
-    load_dotenv()
-
-    dataClient = db(os.environ.get('MONGO_DBNAME'), os.environ.get('MONGO_DBNAME'), 'root', os.environ.get('API_USER_PASS'), 'data')
-    userClient = db(os.environ.get('MONGO_DBNAME'), os.environ.get('MONGO_DBNAME'), 'root', os.environ.get('API_USER_PASS'), 'users')
+    dataClient = db()
+    userClient = db()
+    await dataClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'data')
+    await userClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'users')
     userCol = userClient.collection
     dataCol = dataClient.collection
     print(userCol)
-    try:
-        dataTest = dataCol.find_one({"_id":1})
- 
-        if not dataTest:
-            dataCol.insert_one({"_id":1, 'message':"Hello world from MongoDB!"})
 
-        userTest = userCol.find_one({"_id":1})
-        print(userTest)
+    if not dataClient.passfail or not userClient.passfail:
+        print("Failed to get dataClient and userClient")
+        return
+    else:
+        try:
+            dataTest = dataCol.find_one({"_id":1})
+    
+            if not dataTest:
+                dataCol.insert_one({"_id":1, 'message':"Hello world from MongoDB!"})
+
+            userTest = userCol.find_one({"_id":1})
+            print(userTest)
 
 
-        if not userTest:
-            userCol.insert_one({
-                "_id":1,
-                "username":"test",
-                'password_hash':get_password_hash("test"),
-                'disabled':False
-                })
-    except:
-        pass
+            if not userTest:
+                userCol.insert_one({
+                    "_id":1,
+                    "username":"test",
+                    'password_hash':get_password_hash("test"),
+                    'disabled':False
+                    })
+        except Exception as e:
+            print("Failed api_user tests:", e)
+
+        
     
 async def setup(root_password):
-    try:
-        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
-        
-        rootClient.db.command("updateUser", "root", pwd=root_password)
-        
-    except:
-        print(os.environ["SETUP"])
-        os.environ["SETUP"] = "False"
+    tempPass = secrets.token_urlsafe(16)
+    rootClient = db()
+    await rootClient.connect('admin','root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
 
-    try:
-        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
-        rootClient.collection.find_one()
-    except:
+    if not rootClient.passfail:
+        print("Error: Failed to set root pass:")
+        raise HTTPException(
+            status_code = 401,
+            detail = "ERROR: Default pass not working. Something went wrong",
+        )
+    
+
+    #rootClient.admin.command('createUser', 'tempAdminUser',
+    #                 pwd=tempPass,
+    #                 roles=['userAdminAnyDatabase'])
+
+    #tempAdminClient = db()
+    #await tempAdminClient.connect("admin", 'tempAdminUser', tempPass, 'system.users')
+
+
+    print(rootClient.client.admin.command("updateUser", "root", pwd=root_password))
+    
+    #newRoot = db()
+    #await newRoot.connect('admin','root', root_password, 'system.users')
+
+
+    #newRoot.client.command('dropUser', "tempAdminUser")
+    oldRootClient = db()
+    await oldRootClient.connect('admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+
+    if oldRootClient.passfail:
+        print("Error: Failed to update root password")
+        raise HTTPException(
+            status_code = 500,
+            detail = "Error: Failed to update root password"
+        )
+    else:
         os.environ["SETUP"] = "False"
+        print("Database root pass change success!")
 
     await rebuild_db_users(root_password)
 
@@ -201,16 +241,23 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    raiseError = True
-    try:
-        rootClient = db('admin',  'admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
-        rootClient.collection.find_one()
-    except:
-        raiseError = False
-        
-    if raiseError:
+    rootClient = db()
+    await rootClient.connect('admin','root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
+
+    if rootClient.passfail:
         raise notSetupError
     
+    dataClient = db()
+    await dataClient.connect(os.environ.get('MONGO_DBNAME'),'api_user', os.environ.get('API_USER_PASS'), 'data')
+    
+    if not dataClient.passfail:
+        print("App needs rebuild:")
+        raise HTTPException(
+            status_code = 398,
+            detail = "App not setup",
+            headers={"WWW-Authenticate": "Bearer"}, 
+        )
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -223,10 +270,13 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except:
+    except Exception as e:
+        print(e)
+        print("Credential exception:")
         raise credentials_exception
     user = get_user(username=token_data.username)
     if user is None:
+        print("Error: User is none")
         raise credentials_exception
     return user
 
@@ -241,7 +291,7 @@ async def get_current_active_user(
 
 
 #-----API endpoints-----#
-@app.post("/login", response_model=Token)
+@app.post("/login", response_model=Union[Token, ErrorResponse])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ):
@@ -264,7 +314,7 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/users/me", response_model=User)
+@app.get("/users/me", response_model=Union[User, ErrorResponse])
 async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
     return current_user
 
@@ -282,13 +332,18 @@ async def set_root_password(password: str = Form(...)):
     
     await setup(password)
 
+@app.post("/setup/rebuild")
+async def set_root_password(password: str = Form(...)):\
+    await rebuild_db_users(password)
+    
+
 @app.get("/")
 async def read_root(token: Annotated[str, Depends(get_current_active_user)]):
     data = {}
     try:
         data = dataClient.collection.find_one({"_id": 1})
-    except:
-        pass
+    except Exception as e:
+        print("Failed to fetch data on /:"+e)
     if not data:
        data = {'data':'ERROR'}
     

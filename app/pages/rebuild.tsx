@@ -19,14 +19,14 @@ export default function Setup() {
             setStatus(res.status)
         }
         getData()
-    },[loading])
+    }, [loading])
   
     useEffect(() => {
         if (!loading) {
             if (status >= 400 && status < 600) {
                 router.push('/login');
-            } else if (status === 398) {
-                router.push('/rebuild');
+            } else if (status === 399) {
+                router.push('/setup');
             } else if (status >= 200 && status < 300) {
                 router.push('/dashboard');
             }
@@ -45,34 +45,32 @@ export default function Setup() {
         const formData = new URLSearchParams();
         formData.append('password', password);
 
-        const response = await fetch('/api/setup/setRoot', {
+        const response = await fetch('/api/setup/rebuild', {
             body: formData,
             method: "POST",
         });
 
         if(response.ok){
             const data = await response.json();
-            setStatus(response.status)
+            router.push('/login'); // Use router.push to navigate
             setLoading(false)
 
         } else {
-            setError("Error: Failed to set root password");
+            setError("Error: Failed to rebuild");
             setLoading(false)
         }
     };
 
 
     if(!loading){
-        if (status != 400){
+        if (status == 398){
             return(
                 <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
                     <div className="px-8 py-6 text-left bg-white shadow-lg">
-                        <h3 className="text-2xl font-bold text-center">Please select a root database password</h3>
-                        <h3 className="text-lg font-bold text-center">Save this password!!! You won&apos;t be able to persist changes over rebuilds otherwise!</h3>
+                        <h3 className="text-2xl font-bold text-center">Please enter root database password</h3>
                         <h3 className="text-2xl font-bold text-center">{errorMessage}</h3>
                         <form onSubmit={handleSubmit}>
                             <div className="mt-4">
-                                <label className="block" htmlFor="password">Password</label>
                                 <input 
                                     type="password" 
                                     placeholder="Password" 
@@ -96,7 +94,7 @@ export default function Setup() {
           } else {
             return( 
                 <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
-                    <h1>ERROR: App already set up</h1>
+                    <h1>ERROR</h1>
                 </div>)
           }
       }else{
