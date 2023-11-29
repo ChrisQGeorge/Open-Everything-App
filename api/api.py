@@ -9,7 +9,6 @@ from passlib.context import CryptContext
 from authlib.jose import jwt
 from datetime import datetime, timedelta
 import secrets
-from dotenv import load_dotenv
 
 notSetupError = HTTPException(
         status_code = 399,

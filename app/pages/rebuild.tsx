@@ -7,6 +7,7 @@ export default function Setup() {
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState("");
     const [password, setPassword] = useState("")
+    const [render, renderPage] = useState(false);
     const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
     const router = useRouter(); // Initialize useRouter
     const [errorMessage, setError] = useState('');
@@ -30,6 +31,7 @@ export default function Setup() {
             } else if (status >= 200 && status < 300) {
                 router.push('/dashboard');
             }
+            renderPage(true)
         }
     }, [status, loading, router]);
 
@@ -62,7 +64,7 @@ export default function Setup() {
     };
 
 
-    if(!loading){
+    if(render){
         if (status == 398){
             return(
                 <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
@@ -100,7 +102,7 @@ export default function Setup() {
       }else{
         return (
           <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
-              <p> {!loading ? message : "Loading.."}</p>
+              <p> {!render ? message : "Loading.."}</p>
           </div>
         )
       }

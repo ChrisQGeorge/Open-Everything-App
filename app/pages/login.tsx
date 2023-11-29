@@ -7,6 +7,7 @@ export default function Login() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [errorMessage, setError] = useState('');
+    const [render, renderPage] = useState(false);
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState(100);
@@ -31,6 +32,7 @@ export default function Login() {
             } else if (status >= 200 && status < 300) {
                 router.push('/dashboard');
             }
+            renderPage(true)
         }
     }, [status, loading, router]);
 
@@ -53,7 +55,7 @@ export default function Login() {
             setError("Error: Failed to log in");
         }
     };
-    if(!loading){
+    if(render){
         return (
             <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
                 <div className="px-8 py-6 text-left bg-white shadow-lg">
@@ -98,7 +100,7 @@ export default function Login() {
     }else{
         return (
             <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
-                <p> {!loading ? message : "Loading.."}</p>
+                <p> {!render ? message : "Loading.."}</p>
             </div>
           )
     }

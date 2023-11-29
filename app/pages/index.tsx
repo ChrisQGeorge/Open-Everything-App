@@ -5,6 +5,7 @@ import checkAuth from "../components/checkAuth"
 export default function Home() {
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(true);
+    const [render, renderPage] = useState(false);
     const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
     const router = useRouter(); // Initialize useRouter
 
@@ -29,13 +30,14 @@ export default function Home() {
             } else if (status >= 200 && status < 300) {
                 router.push('/dashboard');
             }
+            renderPage(true)
         }
     }, [status, loading, router]);
 
     
   return (
     <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
-        <p> {!loading ? message : "Loading.."}</p>
+        <p> {!render ? message : "Loading.."}</p>
     </div>
   )
 }
