@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import checkAuth from "../components/checkAuth"
 import Cookie from 'js-cookie';
+import Link from 'next/link';
 
 export default function Login() {
     const [username, setUsername] = useState('');
@@ -91,7 +92,7 @@ export default function Login() {
                             >
                                 Login
                             </button>
-                            <a href="#" className="text-sm text-blue-600 hover:underline mt-4">Forgot password?</a>
+                            <Link href="/register" className="text-sm text-blue-600 hover:underline mt-4">Register</Link>
                         </div>
                     </form>
                 </div>
