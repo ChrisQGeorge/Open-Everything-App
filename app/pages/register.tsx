@@ -66,7 +66,6 @@ export default function Login() {
                     <h3 className="text-2xl font-bold text-center">{errorMessage}</h3>
                     <form onSubmit={handleSubmit}>
                         <div>
-                            <label className="block mt-2" htmlFor="username">Username</label>
                             <input 
                                 type="text" 
                                 placeholder="Username" 
@@ -77,7 +76,6 @@ export default function Login() {
                             />
                         </div>
                         <div>
-                            <label className="block mt-2" htmlFor="username">Email</label>
                             <input 
                                 type="text" 
                                 placeholder="Email" 
@@ -88,7 +86,6 @@ export default function Login() {
                             />
                         </div>
                         <div className="mt-4">
-                            <label className="block" htmlFor="password">Password</label>
                             <input 
                                 type="password" 
                                 placeholder="Password" 
@@ -99,10 +96,9 @@ export default function Login() {
                             />
                         </div>
                         <div className="mt-4">
-                            <label className="block" htmlFor="password">Password Again</label>
                             <input 
                                 type="password" 
-                                placeholder="Password" 
+                                placeholder="Password Again" 
                                 id="checkPassword"
                                 onChange={(e) => setCheckPassword(e.target.value)}
                                 value={checkPassword}
