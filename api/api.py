@@ -49,12 +49,9 @@ async def rebuild_db_users(root_pass):
     
 
     if root.passfail == True:
-        print("Database connected")
         if root.collection.find_one({"user":"api_user"}):
-            print("user found:", root.collection.find_one({"user":"api_user"}))
             root.client.admin.command("updateUser", "api_user", pwd=api_pass)
         else:
-            print("user not found")
             root.client.admin.command("createUser", "api_user",
                 pwd=api_pass,
                 roles=[{"role": "readWrite", "db": os.environ.get('MONGO_DBNAME')}])
@@ -84,21 +81,19 @@ async def configure_db_and_routes():
 
     if not rootClient.passfail:
         os.environ["SETUP"] = "False"
-        print("Not first time setup:")
-    else:
-        print("First Time Setup")
 
 
     if os.environ["SETUP"] == "True":
         await rebuild_db_users(os.environ.get('ROOT_MONGO_PASSWORD'))
 
+    #Connect API users with auto-generated pass
     dataClient = db()
     userClient = db()
     await dataClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'data')
     await userClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'users')
     
+
 async def setup(root_password):
-    tempPass = secrets.token_urlsafe(16)
     rootClient = db()
     await rootClient.connect('admin','root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
 
@@ -109,7 +104,7 @@ async def setup(root_password):
             detail = "ERROR: Default pass not working. Something went wrong",
         )
 
-    print(rootClient.client.admin.command("updateUser", "root", pwd=root_password))
+    rootClient.client.admin.command("updateUser", "root", pwd=root_password)
 
     oldRootClient = db()
     await oldRootClient.connect('admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
@@ -182,7 +177,6 @@ def get_user(username: str):
 
 def authenticate_user(username: str, password: str):
     user = get_user(username)
-    print(user)
     if not user:
         return False
     if not verify_password(password, user["password_hash"]):
@@ -215,7 +209,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         print("App needs rebuild:")
         raise HTTPException(
             status_code = 398,
-            detail = "App not setup",
+            detail = "App needs to be rebuilt",
             headers={"WWW-Authenticate": "Bearer"}, 
         )
 
@@ -232,12 +226,9 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
             raise credentials_exception
         token_data = TokenData(username=username)
     except Exception as e:
-        print(e)
-        print("Credential exception:")
         raise credentials_exception
     user = get_user(username=token_data.username)
     if user is None:
-        print("Error: User is none")
         raise credentials_exception
     return user
 
@@ -300,10 +291,9 @@ async def login_for_access_token(
 async def register_and_get_token(username: Annotated[str, Form()], password: Annotated[str, Form()], email: Annotated[str, Form()]):
     if os.environ["SETUP"] == "True":
         return notSetupError
-    try:
-        user = await register(username, password, email)
-    except Exception as e:
-        print(e)
+
+    user = await register(username, password, email)
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -340,6 +330,7 @@ async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
 
+#Not in use
 @app.get("/")
 async def read_root(token: Annotated[str, Depends(get_current_active_user)]):
     data = {}
