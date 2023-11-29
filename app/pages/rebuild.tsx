@@ -43,7 +43,6 @@ export default function Setup() {
 
         setLoading(true)
 
-        event.preventDefault();
         const formData = new URLSearchParams();
         formData.append('password', password);
 
