@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import checkAuth from "../components/checkAuth"
 import { useRouter } from 'next/router';
+import Cookie from 'js-cookie';
 
 export default function Home() {
   const [message, setMessage] = useState("");
@@ -13,11 +14,11 @@ export default function Home() {
       const getData = async () => {
           const res = await checkAuth();
           setMessage(res.message || '');
-          setLoading(false)
-          setStatus(res.status)
+          setLoading(false);
+          setStatus(res.status);
       }
-      getData()
-  }, [status])
+      getData();
+  }, [status]);
 
   useEffect(() => {
       if (!loading) {
@@ -28,14 +29,29 @@ export default function Home() {
           } else if (status === 398) {
               router.push('/rebuild');
           }
-          renderPage(true)
+          renderPage(true);
       }
   }, [status, loading, router]);
+  
+
+
+  const logout = (() => {
+    Cookie.remove('token');
+    router.push("/")
+  });
+
+
 
   if(render){
     return (
       <div>
         <p>Loaded Dashboard!!!</p>
+
+        <button 
+            className="px-6 py-2 mt-4 text-black bg-white rounded-lg hover:bg-blue-900 w-auto"
+            type="submit"
+            onClick={logout}
+        >Logout</button>
       </div>
     )
   }else{
