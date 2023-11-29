@@ -60,8 +60,10 @@ export default function Login() {
         return (
             <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
                 <div className="px-8 py-6 text-left bg-white shadow-lg">
-                    <h3 className="text-2xl font-bold text-center">Login to your account</h3>
-                    <h3 className="text-2xl font-bold text-center">{errorMessage}</h3>
+                    <div>
+                        <h3 className="text-2xl font-bold text-center">Login to your account</h3>
+                        <h3 className="text-2xl font-bold text-center">{errorMessage}</h3>
+                    </div>
                     <form onSubmit={handleSubmit}>
                         <div>
                             <input 
