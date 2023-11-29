@@ -40,6 +40,43 @@ export default function Login() {
     }, [status, loading, router]);
 
     const handleSubmit = async (event: { preventDefault: () => void; }) => {
+        event.preventDefault(); // Prevent the default form submission
+
+        if(password === checkPassword){
+
+            const formData = new URLSearchParams();
+            formData.append('password', password);
+            formData.append('username', username);
+            formData.append('email', email);
+
+
+
+            const response = await fetch('/api/register', {
+                body: formData,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                method: "POST",
+            });
+
+            if(response.ok){
+                const data = await response.json();
+                Cookie.set('token', data.access_token, { expires: 1 });
+                router.push('/dashboard'); // Use router.push to navigate
+            } else if(response.status === 409){
+                setError("Error: Username or email already exists");
+
+            }else{
+
+                setError("Error: Failed to register");
+            }
+        }else{
+            setError("Error: Passwords do not match");
+        }
+
+
+
+
         /*event.preventDefault(); // Prevent the default form submission
 
         const response = await fetch('/api/login', {

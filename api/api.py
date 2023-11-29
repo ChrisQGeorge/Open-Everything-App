@@ -96,35 +96,6 @@ async def configure_db_and_routes():
     userClient = db()
     await dataClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'data')
     await userClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'users')
-    userCol = userClient.collection
-    dataCol = dataClient.collection
-    print(userCol)
-
-    if not dataClient.passfail or not userClient.passfail:
-        print("Failed to get dataClient and userClient")
-        return
-    else:
-        try:
-            dataTest = dataCol.find_one({"_id":1})
-    
-            if not dataTest:
-                dataCol.insert_one({"_id":1, 'message':"Hello world from MongoDB!"})
-
-            userTest = userCol.find_one({"_id":1})
-            print(userTest)
-
-
-            if not userTest:
-                userCol.insert_one({
-                    "_id":1,
-                    "username":"test",
-                    'password_hash':get_password_hash("test"),
-                    'disabled':False
-                    })
-        except Exception as e:
-            print("Failed api_user tests:", e)
-
-        
     
 async def setup(root_password):
     tempPass = secrets.token_urlsafe(16)
@@ -137,23 +108,9 @@ async def setup(root_password):
             status_code = 401,
             detail = "ERROR: Default pass not working. Something went wrong",
         )
-    
-
-    #rootClient.admin.command('createUser', 'tempAdminUser',
-    #                 pwd=tempPass,
-    #                 roles=['userAdminAnyDatabase'])
-
-    #tempAdminClient = db()
-    #await tempAdminClient.connect("admin", 'tempAdminUser', tempPass, 'system.users')
-
 
     print(rootClient.client.admin.command("updateUser", "root", pwd=root_password))
-    
-    #newRoot = db()
-    #await newRoot.connect('admin','root', root_password, 'system.users')
 
-
-    #newRoot.client.command('dropUser', "tempAdminUser")
     oldRootClient = db()
     await oldRootClient.connect('admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
 
@@ -189,6 +146,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class RegisterForm(BaseModel):
+    username: str
+    email: str
+    password: str
 
 
 class TokenData(BaseModel):
@@ -287,6 +249,28 @@ async def get_current_active_user(
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+async def register(username, password, email):
+    global userClient
+    userCol = userClient.collection
+
+    res = userCol.find_one({"$or": [{"username":username}, {"email":email}] })
+
+    if res:
+        raise HTTPException(
+        status_code = 409,
+        detail = "Username or email already exists",
+        headers={"WWW-Authenticate": "Bearer"}, 
+    )
+
+    userCol.insert_one({
+                    "username":username,
+                    "email":email,
+                    'password_hash':get_password_hash(password),
+                    'disabled':False
+                    })
+    
+    return authenticate_user(username, password)
+
 
 
 #-----API endpoints-----#
@@ -300,6 +284,26 @@ async def login_for_access_token(
     
 
     user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/register", response_model=Union[Token, ErrorResponse])
+async def register_and_get_token(username: Annotated[str, Form()], password: Annotated[str, Form()], email: Annotated[str, Form()]):
+    if os.environ["SETUP"] == "True":
+        return notSetupError
+    try:
+        user = await register(username, password, email)
+    except Exception as e:
+        print(e)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -332,7 +336,7 @@ async def set_root_password(password: str = Form(...)):
     await setup(password)
 
 @app.post("/setup/rebuild")
-async def set_root_password(password: str = Form(...)):\
+async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
 
