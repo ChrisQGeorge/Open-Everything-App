@@ -45,14 +45,16 @@ export default function Dashboard() {
 
   if(render){
     return (
-      <div>
-        <p>Loaded Dashboard!!!</p>
+      <div className="text-black items-center justify-center min-h-screen bg-gradient-to-tl from-pink-300 via-purple-300 to-indigo-400 h-screen flex items-center justify-center">
+        <div className="rounded-xl w-11/12 h-5/6 bg-gray-200 bg-opacity-80 overflow-y-auto p-10">
+          <p>Loaded Dashboard!!!</p>
 
-        <button 
-            className="px-6 py-2 mt-4 text-black bg-white rounded-lg hover:bg-blue-900 w-auto"
-            type="submit"
-            onClick={logout}
-        >Logout</button>
+          <button 
+              className="px-6 py-2 mt-4 text-black bg-white rounded-lg hover:bg-blue-900 w-auto"
+              type="submit"
+              onClick={logout}
+          >Logout</button>
+        </div>
       </div>
     )
   }else{
