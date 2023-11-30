@@ -30,7 +30,7 @@ export default function Rebuild() {
             } else if (status === 399) {
                 router.push('/auth/setup');
             } else if (status >= 200 && status < 300) {
-                router.push('/app/dashboard');
+                router.push('/app');
             }
             renderPage(true)
         }

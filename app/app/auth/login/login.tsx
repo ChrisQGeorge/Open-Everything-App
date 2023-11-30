@@ -52,7 +52,7 @@ export default function Login() {
         if(response.ok){
             const data = await response.json();
             Cookie.set('token', data.access_token, { expires: 1 });
-            router.push('/app/dashboard'); // Use router.push to navigate
+            router.push('/app'); // Use router.push to navigate
         } else {
             setError("Error: Failed to log in");
         }
