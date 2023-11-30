@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import checkAuth from "../../../components/checkAuth"
+import checkAuth from "../../components/checkAuth"
 import Cookie from 'js-cookie';
 import Link from 'next/link';
 

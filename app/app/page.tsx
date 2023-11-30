@@ -1,4 +1,4 @@
-import Index from './index/index';
+import Index from './app/index/index';
 
 export default function Page() {
   return <Index />;

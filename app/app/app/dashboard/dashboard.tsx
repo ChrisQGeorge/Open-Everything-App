@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from 'react';
-import checkAuth from "../../../components/checkAuth"
+import checkAuth from "../../components/checkAuth"
 import { useRouter } from 'next/navigation';
 import Cookie from 'js-cookie';
 
@@ -34,8 +34,6 @@ export default function Dashboard() {
       }
   }, [status, loading, router]);
   
-
-
   const logout = (() => {
     Cookie.remove('token');
     router.push("/")
