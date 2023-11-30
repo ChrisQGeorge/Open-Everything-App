@@ -1,9 +1,10 @@
+"use client"
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import checkAuth from "../components/checkAuth"
+import { useRouter } from 'next/navigation';
+import checkAuth from "../../../components/checkAuth"
 
 
-export default function Setup() {
+export default function Rebuild() {
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState("");
     const [password, setPassword] = useState("")
@@ -25,11 +26,11 @@ export default function Setup() {
     useEffect(() => {
         if (!loading) {
             if (status >= 400 && status < 600) {
-                router.push('/login');
+                router.push('/auth/login');
             } else if (status === 399) {
-                router.push('/setup');
+                router.push('/auth/setup');
             } else if (status >= 200 && status < 300) {
-                router.push('/dashboard');
+                router.push('/app/dashboard');
             }
             renderPage(true)
         }
@@ -53,7 +54,7 @@ export default function Setup() {
 
         if(response.ok){
             const data = await response.json();
-            router.push('/login'); // Use router.push to navigate
+            router.push('/auth/login'); // Use router.push to navigate
             setLoading(false)
 
         } else {
