@@ -1,5 +1,7 @@
-from typing import Annotated, Union
+from typing import Annotated, Union, List, Any, Dict
 import os
+import bson
+from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -9,6 +11,7 @@ from passlib.context import CryptContext
 from authlib.jose import jwt
 from datetime import datetime, timedelta
 import secrets
+from operator import itemgetter
 
 notSetupError = HTTPException(
         status_code = 399,
@@ -37,8 +40,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-class ErrorResponse(BaseModel):
-    detail: str
 
 async def rebuild_db_users(root_pass):
     global dataClient
@@ -123,21 +124,7 @@ async def setup(root_password):
 
     return True
 
-
-#-----Auth-----#
-# using the following pages as a guide 
-# https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
-# https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
-
-#Should generate new JWT token on runtime rather than having to store the token in an open source repo
-SECRET_KEY = secrets.token_urlsafe(32)
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+#-----Models-----#
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -155,11 +142,38 @@ class TokenData(BaseModel):
 class User(BaseModel):
     username: str
     email: str | None = None
+    roles: List[str] | None = None
+    attributes: List[str] | None = None
+    settings: List[str] | None = None
     disabled: bool | None = None
+
 
 
 class UserInDB(User):
     hashed_password: str
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+
+
+class DataArray(BaseModel):
+    dataArr: List[Dict[str, Any]]
+
+
+#-----Auth-----#
+# using the following pages as a guide 
+# https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
+# https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
+
+#Should generate new JWT token on runtime rather than having to store the token in an open source repo
+SECRET_KEY = secrets.token_urlsafe(32)
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password, hashed_password):
      return pwd_context.verify(plain_password.encode('utf-8'), hashed_password)
@@ -256,16 +270,98 @@ async def register(username, password, email):
     userCol.insert_one({
                     "username":username,
                     "email":email,
+                    "joinDateTime":datetime.now(),
                     'password_hash':get_password_hash(password),
-                    'disabled':False
+                    'disabled':False,
+                    'roles':[],
+                    'attributes':[
+                        'weight',
+                        'age',
+                        'mood',
+                        'journal'
+                    ],
+                    'settings':[]
                     })
     
     return authenticate_user(username, password)
 
 #-----Get data-----#
+async def getDataArray(attributeName, user):
+    global dataClient
+    dataCol = dataClient.collection
+
+    res = dataCol.find({"$and": [{"attribute_name":attributeName}, {"username":user.username}]})
+
+    if not res:
+        return []
+
+    resArr = []
+    for doc in res:
+        resArr.append(doc)
+
+    newlist = sorted(resArr, key=itemgetter('startTimeDate')) 
+
+
+    bigArr = []
+
+    for dataArray in newlist:
+        bigArr.extend(dataArray.dataPoints)
+
+    print(bigArr)
+    return bigArr 
+
+
 
 
 #-----Set data-----#
+async def createDataAttribute(attributeName, user):
+    global dataClient
+    dataCol = dataClient.collection
+
+
+    doc = dataCol.insert_one({
+            "username":user.username,
+            "attribute_name":attributeName,
+            "datapoints":[],
+            "startTimeDate":datetime.now(),
+            "endTimeDate":datetime.now()
+        })
+    return doc.inserted_id
+
+
+async def setDatapoint(attributeName, user, data):
+    global dataClient
+    dataCol = dataClient.collection
+
+    datapoint = {"timestamp":datetime.now(), "data":data}
+
+    res = dataCol.find_one({"$and": [{"attribute_name":attributeName}, {"username":user.username}]})
+
+    if not res:
+        id = createDataAttribute(attributeName, user)
+        res = dataCol.find_one({"_id":id})
+    elif res.next_document:
+        while True:
+            res = dataCol.find_one({"_id":res.next_document})
+
+            if not res.next_document:
+                break
+
+    #Create new document and link old document when larger than 10 mb
+    if len(bson.BSON.encode(res)) > 10000000:
+        id = createDataAttribute(attributeName, user)
+        dataCol.update({"_id":res._id}, {"next_document":id})
+        res = dataCol.find_one({"_id":id})
+
+    
+    dataCol.update({"$and": [{"attribute_name":attributeName}, {"username":user.username}]},
+                   {'$set': [{'$push': [{'datapoints': datapoint}]}, {"endDateTime":datapoint["timestamp"]}]})
+    
+
+
+
+
+
 
 #-----API endpoints-----#
 @app.post("/token", response_model=Union[Token, ErrorResponse])
@@ -289,6 +385,7 @@ async def login_for_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 @app.post("/register", response_model=Union[Token, ErrorResponse])
 async def register_and_get_token(username: Annotated[str, Form()], password: Annotated[str, Form()], email: Annotated[str, Form()]):
@@ -314,6 +411,7 @@ async def register_and_get_token(username: Annotated[str, Form()], password: Ann
 async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
     return current_user
 
+
 @app.post("/setup/setRoot")
 async def set_root_password(password: str = Form(...)):
     if os.environ["SETUP"] != "True":
@@ -324,10 +422,18 @@ async def set_root_password(password: str = Form(...)):
     
     await setup(password)
 
+
 @app.post("/setup/rebuild")
 async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
-@app.post("/get")
-async def getData():
-    pass
+
+@app.put("/get/{attrName}", response_model=Union[DataArray, ErrorResponse])
+async def getData(attrName, current_user: Annotated[User, Depends(get_current_active_user)]):
+    dataArr = getDataArray(current_user, attrName)
+    return dataArr
+
+@app.post("/set")
+async def setData(attribute_name: Annotated[str, Form()], datapoint:Annotated[Any, Form()], current_user: Annotated[User, Depends(get_current_active_user)]):
+    print(attribute_name, datapoint, current_user, )
+    setDatapoint(attribute_name, current_user, datapoint)
