@@ -34,7 +34,7 @@ export default function Register() {
             } else if (status === 398) {
                 router.push('/auth/rebuild');
             } else if (status >= 200 && status < 300) {
-                router.push('/auth/dashboard');
+                router.push('/app/dashboard');
             }
             renderPage(true)
         }
