@@ -2,7 +2,6 @@ import Cookie from 'js-cookie';
 
 const checkUserAuthentication = async () => {
     const token = Cookie.get('token');
-    const currStatus = Cookie.get('currStatus')
 
     return fetch('/api/users/me/', {
         headers: {
