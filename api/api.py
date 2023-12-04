@@ -124,7 +124,7 @@ async def setup(root_password):
     return True
 
 
-#-----Auth Setup-----#
+#-----Auth-----#
 # using the following pages as a guide 
 # https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
 # https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
@@ -262,10 +262,13 @@ async def register(username, password, email):
     
     return authenticate_user(username, password)
 
+#-----Get data-----#
 
+
+#-----Set data-----#
 
 #-----API endpoints-----#
-@app.post("/login", response_model=Union[Token, ErrorResponse])
+@app.post("/token", response_model=Union[Token, ErrorResponse])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ):
@@ -311,10 +314,6 @@ async def register_and_get_token(username: Annotated[str, Form()], password: Ann
 async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
     return current_user
 
-@app.get("/setup/firstTimeStartup")
-async def setup_confirm():
-    return {'data':os.environ["SETUP"]}
-    
 @app.post("/setup/setRoot")
 async def set_root_password(password: str = Form(...)):
     if os.environ["SETUP"] != "True":
@@ -329,16 +328,6 @@ async def set_root_password(password: str = Form(...)):
 async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
-
-#Not in use
-@app.get("/")
-async def read_root(token: Annotated[str, Depends(get_current_active_user)]):
-    data = {}
-    try:
-        data = dataClient.collection.find_one({"_id": 1})
-    except Exception as e:
-        print("Failed to fetch data on /:"+e)
-    if not data:
-       data = {'data':'ERROR'}
-    
-    return {'message':data["message"]}
+@app.post("/get")
+async def getData():
+    pass

@@ -41,7 +41,7 @@ export default function Login() {
     const handleSubmit = async (event: { preventDefault: () => void; }) => {
         event.preventDefault(); // Prevent the default form submission
 
-        const response = await fetch('/api/login', {
+        const response = await fetch('/api/token', {
             body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
