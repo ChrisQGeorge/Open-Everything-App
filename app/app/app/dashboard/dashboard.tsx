@@ -67,7 +67,7 @@ export default function Dashboard() {
           'Authorization': `Bearer ${token}`
         },
 
-        method: "POST",
+        method: "GET",
     });
     console.log(response)
   

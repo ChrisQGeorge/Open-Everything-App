@@ -19,10 +19,8 @@ notSetupError = HTTPException(
         headers={"WWW-Authenticate": "Bearer"}, 
     )
 
-
 #-----App Setup-----#
 app = FastAPI()
-
 
 #Restrict IP's to internal docker containers
 origins = [
@@ -184,6 +182,7 @@ def get_password_hash(password):
 
 
 def get_user(username: str):
+    global userClient
     col = userClient.collection
 
     return col.find_one({'username':username})
@@ -290,7 +289,7 @@ async def getDataArray(attributeName, user):
     global dataClient
     dataCol = dataClient.collection
 
-    res = dataCol.find({"$and": [{"attribute_name":attributeName}, {"username":user.username}]})
+    res = dataCol.find({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]})
 
     if not res:
         return []
@@ -307,10 +306,13 @@ async def getDataArray(attributeName, user):
     for dataArray in newlist:
         bigArr.extend(dataArray.dataPoints)
 
-    print(bigArr)
     return bigArr 
 
-
+#-----Utility Functions-----#
+def cursorToDict(cursor):
+    if not cursor or isinstance(cursor, dict): return cursor
+ 
+    return dict(zip(zip(*cursor.description)[0], cursor.fetchone()))
 
 
 #-----Set data-----#
@@ -320,14 +322,14 @@ async def createDataAttribute(attributeName, user):
 
 
     doc = dataCol.insert_one({
-            "username":user.username,
+            "username":user['username'],
             "attribute_name":attributeName,
+            "next_document":"",
             "datapoints":[],
             "startTimeDate":datetime.now(),
             "endTimeDate":datetime.now()
         })
     return doc.inserted_id
-
 
 async def setDatapoint(attributeName, user, data):
     global dataClient
@@ -335,28 +337,39 @@ async def setDatapoint(attributeName, user, data):
 
     datapoint = {"timestamp":datetime.now(), "data":data}
 
-    res = dataCol.find_one({"$and": [{"attribute_name":attributeName}, {"username":user.username}]})
+    res = cursorToDict(dataCol.find_one({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]}))
 
-    if not res:
-        id = createDataAttribute(attributeName, user)
-        res = dataCol.find_one({"_id":id})
-    elif res.next_document:
-        while True:
-            res = dataCol.find_one({"_id":res.next_document})
-
-            if not res.next_document:
-                break
+    if res:
+        if res['next_document']:
+            while True:
+                res = cursorToDict(dataCol.find_one({"_id":res['next_document']}))
+                
+                if not res['next_document']:
+                    break
+    else:
+        id = await createDataAttribute(attributeName, user)
+        res = cursorToDict(dataCol.find_one({"_id":id}))
 
     #Create new document and link old document when larger than 10 mb
-    if len(bson.BSON.encode(res)) > 10000000:
-        id = createDataAttribute(attributeName, user)
-        dataCol.update({"_id":res._id}, {"next_document":id})
-        res = dataCol.find_one({"_id":id})
 
-    
-    dataCol.update({"$and": [{"attribute_name":attributeName}, {"username":user.username}]},
-                   {'$set': [{'$push': [{'datapoints': datapoint}]}, {"endDateTime":datapoint["timestamp"]}]})
-    
+    #print(res)
+    if len(bson.BSON.encode(res)) > 10000000:
+        id = await createDataAttribute(attributeName, user)
+        id = id
+        dataCol.update({"_id":res['_id']}, {"next_document":id})
+        res = cursorToDict(dataCol.find_one({"_id":id}))
+
+
+    result = dataCol.update_one(
+        {"_id": res["_id"]},
+        {
+            '$push': {'datapoints': {"timestamp": datetime.now(), "data": data}},
+            '$set': {"endDateTime": datetime.now()}
+        }
+    )
+    print (result)
+
+
 
 
 
@@ -428,12 +441,13 @@ async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
 
-@app.put("/get/{attrName}", response_model=Union[DataArray, ErrorResponse])
+@app.get("/get/{attrName}")
 async def getData(attrName, current_user: Annotated[User, Depends(get_current_active_user)]):
-    dataArr = getDataArray(current_user, attrName)
+
+    dataArr = await getDataArray(attrName,current_user)
+
     return dataArr
 
 @app.post("/set")
 async def setData(attribute_name: Annotated[str, Form()], datapoint:Annotated[Any, Form()], current_user: Annotated[User, Depends(get_current_active_user)]):
-    print(attribute_name, datapoint, current_user, )
-    setDatapoint(attribute_name, current_user, datapoint)
+    await setDatapoint(attribute_name, current_user, datapoint)
