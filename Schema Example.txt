@@ -31,7 +31,7 @@ Data document, where user attribute data is stored db/data
 data{
     _id:int,
     username:int,
-    next_document
+    next_document:str,
     attribute_name:string,
     datapoints: [[index: int, timestamp: timestamp, datapoint: int, string, bool, float] ... [index n: int, timestamp: timestamp, datapoint: int, string, bool, float]],
     startTimeDate: timestamp,
