@@ -5,6 +5,9 @@ from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from starlette.exceptions import HTTPException
+from fastapi.exceptions import RequestValidationError
+from exception_handlers import request_validation_exception_handler, http_exception_handler, unhandled_exception_handler
 from dbConnection import DB as db
 from pydantic import BaseModel
 from passlib.context import CryptContext
@@ -21,6 +24,10 @@ notSetupError = HTTPException(
 
 #-----App Setup-----#
 app = FastAPI()
+
+app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 #Restrict IP's to internal docker containers
 origins = [
