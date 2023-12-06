@@ -30,8 +30,6 @@ export default function Dashboard() {
           setLoading(false);
           setStatus(res.status);
           setUser(res.data)
-          console.log(res.data)
-          console.log(res.data.attributes)
 
           if(res.data.attributes){
             setAttributes(res.data.attributes)
@@ -69,7 +67,14 @@ export default function Dashboard() {
 
         method: "GET",
     });
-    console.log(response)
+
+    if(response.ok){
+      const data = response.json()
+
+      console.log(data)
+
+
+    }
   
 
   

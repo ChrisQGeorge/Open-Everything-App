@@ -161,9 +161,16 @@ class UserInDB(User):
 class ErrorResponse(BaseModel):
     detail: str
 
+class DataPoint(BaseModel):
+    data: Any
+    timestamp: datetime
+
+    class Config:
+        extra = 'allow'
 
 class DataArray(BaseModel):
-    dataArr: List[Dict[str, Any]]
+    data_array: List[DataPoint]
+
 
 
 #-----Auth-----#
@@ -311,7 +318,7 @@ async def getDataArray(attributeName, user):
     bigArr = []
 
     for dataArray in newlist:
-        bigArr.extend(dataArray.dataPoints)
+        bigArr.extend(dataArray["datapoints"])
 
     return bigArr 
 
@@ -448,12 +455,12 @@ async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
 
-@app.get("/get/{attrName}")
+@app.get("/get/{attrName}",response_model=Union[DataArray, ErrorResponse])
 async def getData(attrName, current_user: Annotated[User, Depends(get_current_active_user)]):
 
     dataArr = await getDataArray(attrName,current_user)
 
-    return dataArr
+    return {"data_array":dataArr}
 
 @app.post("/set")
 async def setData(attribute_name: Annotated[str, Form()], datapoint:Annotated[Any, Form()], current_user: Annotated[User, Depends(get_current_active_user)]):
