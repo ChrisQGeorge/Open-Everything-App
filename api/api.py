@@ -2,7 +2,7 @@ from typing import Annotated, Union, List, Any, Dict
 import os
 import bson
 from datetime import datetime
-from fastapi import Depends, FastAPI, HTTPException, status, Form
+from fastapi import Depends, FastAPI, HTTPException, status, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from starlette.exceptions import HTTPException
@@ -169,7 +169,9 @@ class DataPoint(BaseModel):
         extra = 'allow'
 
 class DataArray(BaseModel):
+    attr_name: str
     data_array: List[DataPoint]
+
 
 
 
@@ -306,7 +308,7 @@ async def getDataArray(attributeName, user):
     res = dataCol.find({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]})
 
     if not res:
-        return []
+        return {"attr_name":attributeName, "data_array":[]}
 
     resArr = []
     for doc in res:
@@ -320,7 +322,7 @@ async def getDataArray(attributeName, user):
     for dataArray in newlist:
         bigArr.extend(dataArray["datapoints"])
 
-    return bigArr 
+    return {"attr_name":attributeName, "data_array":bigArr}
 
 #-----Utility Functions-----#
 def cursorToDict(cursor):
@@ -374,20 +376,13 @@ async def setDatapoint(attributeName, user, data):
         res = cursorToDict(dataCol.find_one({"_id":id}))
 
 
-    result = dataCol.update_one(
+    dataCol.update_one(
         {"_id": res["_id"]},
         {
             '$push': {'datapoints': {"timestamp": datetime.now(), "data": data}},
             '$set': {"endDateTime": datetime.now()}
         }
     )
-    print (result)
-
-
-
-
-
-
 
 
 #-----API endpoints-----#
@@ -460,7 +455,19 @@ async def getData(attrName, current_user: Annotated[User, Depends(get_current_ac
 
     dataArr = await getDataArray(attrName,current_user)
 
-    return {"data_array":dataArr}
+    return dataArr
+
+@app.get("/getMany",response_model=Union[dict[str, list[DataArray]], ErrorResponse])
+async def getMuchData( current_user: Annotated[User, Depends(get_current_active_user)], a: Annotated[list[str], Query()] = []):
+    result = []
+    print(a)
+    if(a):
+        for attr in a:
+            result.append(await getDataArray(attr,current_user))
+    print(result)
+    return {"data": result}
+
+
 
 @app.post("/set")
 async def setData(attribute_name: Annotated[str, Form()], datapoint:Annotated[Any, Form()], current_user: Annotated[User, Depends(get_current_active_user)]):
