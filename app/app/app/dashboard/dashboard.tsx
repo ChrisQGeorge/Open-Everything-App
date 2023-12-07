@@ -4,12 +4,31 @@ import checkAuth from "../../components/checkAuth"
 import { useRouter } from 'next/navigation';
 import Cookie from 'js-cookie';
 
+const blankUser = {
+  'username':"",
+  'email':"",
+  'profile_image':"",
+  'attributes':[""],
+  'roles':[""],
+  'settings':[""]
+}
+
+interface AttributeData {
+  attr_name: string;
+  data_array: any[]; // Replace 'any' with a more specific type if possible
+  id: string; // Assuming each item has an 'id' for the key prop
+}
+
 const Dashboard = () =>  {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [render, renderPage] = useState(false);
+  const [user, setUser] = useState(blankUser)
+  const [attributes, setAttributes] = useState([])
+  const [attrArray, setAttrArray] = useState<AttributeData[]>([]);
   const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
   const router = useRouter(); // Initialize useRouter
+  const token = Cookie.get("token") || null
 
   useEffect(() => {
       const getData = async () => {
@@ -17,6 +36,12 @@ const Dashboard = () =>  {
           setMessage(res.message || '');
           setLoading(false);
           setStatus(res.status);
+          setUser(res.data)
+
+          if(res.data.attributes){
+            setAttributes(res.data.attributes)
+            loadAttributes()
+          }
       }
       getData();
   }, [status]);
@@ -34,10 +59,53 @@ const Dashboard = () =>  {
       }
   }, [status, loading, router]);
   
+
+
   const logout = (() => {
     Cookie.remove('token');
     router.push("/")
   });
+
+  /*const getData = async (attribute: string) => {
+
+    const response = await  fetch('/api/get/'+attribute, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+
+        method: "GET",
+    });
+
+    if(response.ok){
+      const data = await response.json()
+      if(data.data_array){
+        return {attribute: data.data_array}
+      } else {
+        return {attribute: null}
+      }
+
+
+    }*/
+  
+const loadAttributes = async () => {
+    const queryParams = new URLSearchParams();
+    for (let attribute of attributes) {
+        queryParams.append('a', attribute);
+    }
+    const response = await fetch('/api/getMany?' + queryParams.toString(), {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        },
+        method: "GET",
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        if (data.data) {
+            setAttrArray(data.data);
+        }
+    }
+};
 
 
 
