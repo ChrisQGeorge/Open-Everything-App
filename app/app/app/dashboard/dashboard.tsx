@@ -92,9 +92,6 @@ const loadAttributes = async () => {
     for (let attribute of attributes) {
         queryParams.append('a', attribute);
     }
-
-    console.log(queryParams.toString());
-
     const response = await fetch('/api/getMany?' + queryParams.toString(), {
         headers: {
             'Authorization': `Bearer ${token}`
@@ -107,7 +104,6 @@ const loadAttributes = async () => {
         if (data.data) {
             setAttrArray(data.data);
         }
-        console.log(attrArray)
     }
 };
 

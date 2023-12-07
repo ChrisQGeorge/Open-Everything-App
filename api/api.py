@@ -460,11 +460,9 @@ async def getData(attrName, current_user: Annotated[User, Depends(get_current_ac
 @app.get("/getMany",response_model=Union[dict[str, list[DataArray]], ErrorResponse])
 async def getMuchData( current_user: Annotated[User, Depends(get_current_active_user)], a: Annotated[list[str], Query()] = []):
     result = []
-    print(a)
     if(a):
         for attr in a:
             result.append(await getDataArray(attr,current_user))
-    print(result)
     return {"data": result}
 
 
