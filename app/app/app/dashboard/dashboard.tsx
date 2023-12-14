@@ -177,7 +177,7 @@ const CatNav: React.FC<CatNavProps> = ({ catList, currCat, loadCat, createCatego
           const trStyles = "rounded w-full font-semibold cursor-pointer " + ((currentCategory == data.category) ? "bg-gray-400 bg-opacity-40" : "")
 
           return(
-            <tr id= {data.category} className={trStyles}  onClick ={() => handleSelect(data.category)}>
+            <tr id= {data.category} key={"category"+data.category} className={trStyles}  onClick ={() => handleSelect(data.category)}>
               <td className = {data.color}>
                 <IconComp />
               </td>
@@ -238,7 +238,7 @@ const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
   <div className="min-h-full h-auto rounded-xl bg-gray-200 bg-opacity-80 box-border p-4" >
     <table className="w-full p-0">
         {attrs.map((dataArray: AttributeData) => (
-          <tr className="border-b-[10px] border-transparent"key={String(dataArray.attr_name)}>
+          <tr className="border-b-[10px] border-transparent"key={"datapoint"+String(dataArray.attr_name)}>
             <td className="text-xl font-semibold float-left">
               {String(dataArray.attr_name)}
             </td>
