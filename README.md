@@ -8,6 +8,7 @@ To run the application, clone the git repository and run the following command
 ```
 docker-compose up -d
 ```
+The app is hosted at locahost:3000
 
 From there, follow the prompts and create a root password (NOTE: You will need this password if the API restarts. Please save it or you will lose your data!)
 After that, register an account and log in.
@@ -25,3 +26,10 @@ For back end development, first run the application using Docker.
 At this point, make whatever changes you like and then save
 To run the application with your changes, use the command ```docker-compose up -d --build --force-recreate api```
 From here, type in your selected root password and login
+
+You can also directly access the API by adding 
+```
+ports:
+  - "5000:5000"
+```
+to the docker-compose.yml api container. Fom there, you can directly test the API by going to locahost:5000/docs
