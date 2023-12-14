@@ -283,17 +283,26 @@ async def register(username, password, email):
     )
 
     userCol.insert_one({
-                    "username":username,
-                    "email":email,
-                    "joinDateTime":datetime.now(),
+                    'username':username,
+                    'email':email,
+                    'joinDateTime':datetime.now(),
                     'password_hash':get_password_hash(password),
                     'disabled':False,
                     'roles':[],
+                    'categories':[
+                        {'category':"basic"       , 'icon':"UilHeart"     , 'color':"text-[#d10a0a]"},
+                        {'category':"health"      , 'icon':"UilHeart"     , 'color':"text-[#fcba03]"},
+                        {'category':"body"        , 'icon':"UilWeight"    , 'color':"text-[blue]"   },
+                        {'category':"food"        , 'icon':"UilPizzaSlice", 'color':"text-[green]"  },
+                        {'category':"fitness"     , 'icon':"UilDumbbell"  , 'color':"text-[violet]" },
+                        {'category':"mental"      , 'icon':"UilHeart"     , 'color':"text-[#878787]"},
+                        {'category':"productivity", 'icon':"UilClock"     , 'color':"text-[black]"  },
+                    ],
                     'attributes':[
-                        'weight',
-                        'age',
-                        'mood',
-                        'journal'
+                        {'attribute_name':'weight' ,'datatype':'float'  ,'category':'body'  },
+                        {'attribute_name':'age'    ,'datatype':'int'    ,'category':'basic' },
+                        {'attribute_name':'mood'   ,'datatype':'int'    ,'category':'mental'},
+                        {'attribute_name':'journal','datatype':'journal','category':'mental'}
                     ],
                     'settings':[]
                     })
@@ -386,6 +395,9 @@ async def setDatapoint(attributeName, user, data):
 
 
 #-----API endpoints-----#
+    
+
+#Auth and setup routes
 @app.post("/token", response_model=Union[Token, ErrorResponse])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
@@ -429,11 +441,6 @@ async def register_and_get_token(username: Annotated[str, Form()], password: Ann
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/users/me", response_model=Union[User, ErrorResponse])
-async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
-    return current_user
-
-
 @app.post("/setup/setRoot")
 async def set_root_password(password: str = Form(...)):
     if os.environ["SETUP"] != "True":
@@ -448,14 +455,26 @@ async def set_root_password(password: str = Form(...)):
 @app.post("/setup/rebuild")
 async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
-    
 
+
+#User Routes
+
+@app.get("/users/me", response_model=Union[User, ErrorResponse])
+async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
+    return current_user
+
+
+
+
+#Data routes
 @app.get("/get/{attrName}",response_model=Union[DataArray, ErrorResponse])
 async def getData(attrName, current_user: Annotated[User, Depends(get_current_active_user)]):
 
     dataArr = await getDataArray(attrName,current_user)
 
     return dataArr
+
+
 
 @app.get("/getMany",response_model=Union[dict[str, list[DataArray]], ErrorResponse])
 async def getMuchData( current_user: Annotated[User, Depends(get_current_active_user)], a: Annotated[list[str], Query()] = []):
