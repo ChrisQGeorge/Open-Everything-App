@@ -1,7 +1,8 @@
 "use client"
-import { useEffect, useState, createContext} from 'react';
+import { useEffect, useState, createContext, JSXElementConstructor, Key, PromiseLikeOfReactNode, ReactElement, ReactNode} from 'react';
 import checkAuth from "../../components/checkAuth"
 import { useRouter } from 'next/navigation';
+import * as Unicons from '@iconscout/react-unicons';
 import Cookie from 'js-cookie';
 
 const blankUser = {
@@ -13,11 +14,14 @@ const blankUser = {
   'settings':[""]
 }
 
-interface AttributeData {
-  attr_name: string;
-  data_array: any[]; // Replace 'any' with a more specific type if possible
-  id: string; // Assuming each item has an 'id' for the key prop
-}
+const sampleCatagories = [
+  {catagory:"Health", icon:"UilHeart", color:"text-red-500"},
+  {catagory:"Body", icon:"UilWeight",color:"text-blue-500"},
+  {catagory:"Food",icon:"UilPizzaSlice",color:"text-green-500"},
+  {catagory:"Fitness",icon:"UilDumbbell",color:"text-purple-500"},
+  {catagory:"Productivity",icon:"UilClock",color:"text-black-500"},
+]
+
 
 const Dashboard = () =>  {
   const [message, setMessage] = useState("");
@@ -27,6 +31,8 @@ const Dashboard = () =>  {
   const [attributes, setAttributes] = useState([])
   const [attrArray, setAttrArray] = useState<AttributeData[]>([]);
   const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
+  const [currentCategory, setCategory] = useState("default");
+  const [categories, setCategoryList] = useState(sampleCatagories);
   const router = useRouter(); // Initialize useRouter
   const token = Cookie.get("token") || null
 
@@ -87,64 +93,47 @@ const Dashboard = () =>  {
 
     }*/
   
-const loadAttributes = async () => {
-    const queryParams = new URLSearchParams();
-    for (let attribute of attributes) {
-        queryParams.append('a', attribute);
-    }
-    const response = await fetch('/api/getMany?' + queryParams.toString(), {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
-        method: "GET",
-    });
+  const loadAttributes = async () => {
+      const queryParams = new URLSearchParams();
+      for (let attribute of attributes) {
+          queryParams.append('a', attribute);
+      }
+      const response = await fetch('/api/getMany?' + queryParams.toString(), {
+          headers: {
+              'Authorization': `Bearer ${token}`
+          },
+          method: "GET",
+      });
 
-    if (response.ok) {
-        const data = await response.json();
-        if (data.data) {
-            setAttrArray(data.data);
-        }
-    }
-};
+      if (response.ok) {
+          const data = await response.json();
+          if (data.data) {
+              setAttrArray(data.data);
+          }
+      }
+  };
+
+  const createCategory = async () => {
+    console.log("Create Attribute Button Pressed")
+  }
 
   if(render){
     return (
       <div className="text-black items-center justify-center min-h-screen bg-gradient-to-tl from-pink-300 via-purple-300 to-indigo-400 h-screen flex items-center justify-center">
         <div className="rounded-xl w-11/12 h-5/6 bg-gray-200 bg-opacity-50 p-7">
           <div className="p-0 inline-block h-full w-full overflow-visible">
-            <div className="w-[calc(33%-16px)] h-full mr-4 p-0 float-left box-border">
-              <div className="h-1/3 w-full mb-4 box-border">
-                <CatNav />
-              </div>
-              <div className="h-1/3 w-full box-border">
-                <div className="h-full w-full rounded-xl bg-gray-200 m-0 bg-opacity-80" >
-
-                  <p>Test Pane2</p>
-
-                </div>
-              </div>
+            <div className="w-[calc(33%-16px)] h-full mr-4 p-0 float-left box-border overflow-auto">
+              <h1>Current Category: {currentCategory}</h1>
+              <CatNav createCategory={createCategory} loadCat={setCategory} catList={categories}/>
+              <PageNav />
+              <button 
+                  className="px-6 py-2 mt-4 text-black bg-white rounded-lg hover:bg-blue-900 w-auto"
+                  type="submit"
+                  onClick={logout}
+              >Logout</button>
             </div>
-            <div className="w-[67%] h-full m-0 float-left box-border">
-              <div className="h-full w-full rounded-xl bg-gray-200 bg-opacity-80 box-border" >
-                <table className="w-full max-w-lg float-right">
-                    {attrArray.map((dataArray) => (
-                      <tr key={dataArray.attr_name}>
-                        <td className="text-lg font-semibold float-left">
-                          {dataArray.attr_name}
-                        </td>
-                        <td className="text-lg font-medium float-right">
-                          {dataArray.data_array.length > 0 ? JSON.parse(dataArray.data_array[dataArray.data_array.length - 1].data) : 'Enter Value'}
-                        </td>
-                      </tr>
-                        ))}
-                </table>
-
-                <button 
-                    className="px-6 py-2 mt-4 text-black bg-white rounded-lg hover:bg-blue-900 w-auto"
-                    type="submit"
-                    onClick={logout}
-                >Logout</button>
-              </div>
+            <div className="w-[67%] h-full overflow-auto m-0 float-left box-border">
+              <AttributesTable attrs={attrArray}/>
             </div>
           </div>
         </div>
@@ -157,16 +146,104 @@ const loadAttributes = async () => {
       </div>
     )
   }
-
 }
 
-function CatNav(){
+
+interface CatagoryData {
+  catagory:string;
+  icon:string
+  color:string
+}
+
+interface CatNavProps {
+  catList:CatagoryData[]
+  loadCat: (category: string) => void;
+  createCategory: () => void;
+}
+
+
+const CatNav: React.FC<CatNavProps> = ({ catList, loadCat, createCategory }) => {
+
+
   return (
-      <div className="h-full w-full rounded-xl bg-gray-200 bg-opacity-80 m-0" >
+    <div className=" min-h-[33%] h-auto p-4 w-full mb-4 box-border rounded-xl bg-gray-200 bg-opacity-80 m-0">
+      <table className="w-full">
+        {catList.map((data: CatagoryData) => {
+          const IconComp = Unicons[data.icon];
 
-          <p>Test Pane</p>
+          return(
+            <tr className="w-full font-semibold cursor-pointer" onClick ={() => loadCat(data.catagory)}>
+              <td className = {data.color}>
+                <IconComp />
+              </td>
+              <td className="pl-4 text-lg">
+                {data.catagory}
+              </td>
+            </tr>
+          )
+        })}
+        <tr className="cursor-pointer font-semibold" onClick={() => createCategory()}>
+          <td><Unicons.UilPlus /></td>
+          <td className="pl-4">
+            <button className="text-lg">Add More</button>
+          </td>
+        </tr>
+      </table>
+    </div>
 
-      </div>
+  )
+}
+
+const PageNav = (props: any) => {
+
+  const handleNav = (page: string) => {
+    //router.push('/app/'+page)
+  }
+ 
+  return (
+    <div className="min-h-[33%] p-4 w-full box-border box-border w-full rounded-xl bg-gray-200 m-0 bg-opacity-80">
+      <table> 
+        <tr>
+          <td onClick = {() => handleNav("test")}>
+
+          </td>
+          <td>
+
+          </td>
+        </tr>
+
+      </table>
+    </div>
+
+  )
+}
+
+
+interface AttributeData {
+  attr_name: string;
+  data_array: any[]; // Replace 'any' with a more specific type if possible
+  id: string; // Assuming each item has an 'id' for the key prop
+}
+
+interface AttributesTableProps {
+  attrs: AttributeData[];
+}
+const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
+  return (
+  <div className="min-h-full h-auto rounded-xl bg-gray-200 bg-opacity-80 box-border p-4" >
+    <table className="w-full p-0">
+        {attrs.map((dataArray: AttributeData) => (
+          <tr className="border-b-[10px] border-transparent"key={String(dataArray.attr_name)}>
+            <td className="text-xl font-semibold float-left">
+              {String(dataArray.attr_name)}
+            </td>
+            <td className="text-xl font-medium float-right">
+              <input></input>{dataArray.data_array.length > 0 ? JSON.parse(dataArray.data_array[dataArray.data_array.length - 1].data) : 'Enter Value'}
+            </td>
+          </tr>
+            ))}
+    </table>
+  </div>
   )
 
 }
