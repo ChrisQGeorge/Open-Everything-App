@@ -15,11 +15,11 @@ const blankUser = {
 }
 
 const sampleCatagories = [
-  {catagory:"Health", icon:"UilHeart", color:"text-red-500"},
-  {catagory:"Body", icon:"UilWeight",color:"text-blue-500"},
-  {catagory:"Food",icon:"UilPizzaSlice",color:"text-green-500"},
-  {catagory:"Fitness",icon:"UilDumbbell",color:"text-purple-500"},
-  {catagory:"Productivity",icon:"UilClock",color:"text-black-500"},
+  {category:"Health", icon:"UilHeart", color:"text-[#fcba03]"},
+  {category:"Body", icon:"UilWeight",color:"text-[blue]"},
+  {category:"Food",icon:"UilPizzaSlice",color:"text-[green]"},
+  {category:"Fitness",icon:"UilDumbbell",color:"text-[violet]"},
+  {category:"Productivity",icon:"UilClock",color:"text-[black]"},
 ]
 
 
@@ -123,8 +123,7 @@ const Dashboard = () =>  {
         <div className="rounded-xl w-11/12 h-5/6 bg-gray-200 bg-opacity-50 p-7">
           <div className="p-0 inline-block h-full w-full overflow-visible">
             <div className="w-[calc(33%-16px)] h-full mr-4 p-0 float-left box-border overflow-auto">
-              <h1>Current Category: {currentCategory}</h1>
-              <CatNav createCategory={createCategory} loadCat={setCategory} catList={categories}/>
+              <CatNav createCategory={createCategory} currCat={currentCategory} loadCat={setCategory} catList={categories}/>
               <PageNav />
               <button 
                   className="px-6 py-2 mt-4 text-black bg-white rounded-lg hover:bg-blue-900 w-auto"
@@ -149,35 +148,41 @@ const Dashboard = () =>  {
 }
 
 
-interface CatagoryData {
-  catagory:string;
+interface CategoryData {
+  category:string;
   icon:string
   color:string
 }
 
 interface CatNavProps {
-  catList:CatagoryData[]
+  catList:CategoryData[]
+  currCat:string
   loadCat: (category: string) => void;
   createCategory: () => void;
 }
 
 
-const CatNav: React.FC<CatNavProps> = ({ catList, loadCat, createCategory }) => {
+const CatNav: React.FC<CatNavProps> = ({ catList, currCat, loadCat, createCategory }) => {
+  var currentCategory = currCat
 
+  const handleSelect = (category: string) => {
+    loadCat(category)
+  }
 
   return (
     <div className=" min-h-[33%] h-auto p-4 w-full mb-4 box-border rounded-xl bg-gray-200 bg-opacity-80 m-0">
       <table className="w-full">
-        {catList.map((data: CatagoryData) => {
+        {catList.map((data: CategoryData) => {
           const IconComp = Unicons[data.icon];
+          const trStyles = "rounded w-full font-semibold cursor-pointer " + ((currentCategory == data.category) ? "bg-gray-400 bg-opacity-40" : "")
 
           return(
-            <tr className="w-full font-semibold cursor-pointer" onClick ={() => loadCat(data.catagory)}>
+            <tr id= {data.category} className={trStyles}  onClick ={() => handleSelect(data.category)}>
               <td className = {data.color}>
                 <IconComp />
               </td>
               <td className="pl-4 text-lg">
-                {data.catagory}
+                {data.category}
               </td>
             </tr>
           )
