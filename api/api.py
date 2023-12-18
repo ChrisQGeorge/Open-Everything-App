@@ -143,12 +143,22 @@ class RegisterForm(BaseModel):
 class TokenData(BaseModel):
     username: str | None = None
 
+class UserCategory(BaseModel):
+    category: str
+    icon: str
+    color: str
+
+class UserAttribute(BaseModel):
+    attribute_name: str
+    datatype: str
+    category: str
 
 class User(BaseModel):
     username: str
     email: str | None = None
     roles: List[str] | None = None
-    attributes: List[str] | None = None
+    attributes: List[UserAttribute] | None = None
+    categories: List[UserCategory]
     settings: List[str] | None = None
     disabled: bool | None = None
 
@@ -169,7 +179,7 @@ class DataPoint(BaseModel):
         extra = 'allow'
 
 class DataArray(BaseModel):
-    attr_name: str
+    attribute_name: str
     data_array: List[DataPoint]
 
 
@@ -290,13 +300,13 @@ async def register(username, password, email):
                     'disabled':False,
                     'roles':[],
                     'categories':[
-                        {'category':"basic"       , 'icon':"UilHeart"     , 'color':"text-[#d10a0a]"},
-                        {'category':"health"      , 'icon':"UilHeart"     , 'color':"text-[#fcba03]"},
-                        {'category':"body"        , 'icon':"UilWeight"    , 'color':"text-[blue]"   },
-                        {'category':"food"        , 'icon':"UilPizzaSlice", 'color':"text-[green]"  },
-                        {'category':"fitness"     , 'icon':"UilDumbbell"  , 'color':"text-[violet]" },
-                        {'category':"mental"      , 'icon':"UilHeart"     , 'color':"text-[#878787]"},
-                        {'category':"productivity", 'icon':"UilClock"     , 'color':"text-[black]"  },
+                        {'category':"basic"       , 'icon':"UilHeart"     , 'color':"#d10a0a"},
+                        {'category':"health"      , 'icon':"UilHeart"     , 'color':"#fcba03]"},
+                        {'category':"body"        , 'icon':"UilWeight"    , 'color':"blue]"   },
+                        {'category':"food"        , 'icon':"UilPizzaSlice", 'color':"green]"  },
+                        {'category':"fitness"     , 'icon':"UilDumbbell"  , 'color':"violet]" },
+                        {'category':"mental"      , 'icon':"UilHeart"     , 'color':"#878787]"},
+                        {'category':"productivity", 'icon':"UilClock"     , 'color':"black"  },
                     ],
                     'attributes':[
                         {'attribute_name':'weight' ,'datatype':'float'  ,'category':'body'  },
@@ -317,7 +327,7 @@ async def getDataArray(attributeName, user):
     res = dataCol.find({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]})
 
     if not res:
-        return {"attr_name":attributeName, "data_array":[]}
+        return {"attribute_name":attributeName, "data_array":[]}
 
     resArr = []
     for doc in res:
@@ -331,7 +341,7 @@ async def getDataArray(attributeName, user):
     for dataArray in newlist:
         bigArr.extend(dataArray["datapoints"])
 
-    return {"attr_name":attributeName, "data_array":bigArr}
+    return {"attribute_name":attributeName, "data_array":bigArr}
 
 #-----Utility Functions-----#
 def cursorToDict(cursor):
@@ -481,11 +491,16 @@ async def getMuchData( current_user: Annotated[User, Depends(get_current_active_
     result = []
     if(a):
         for attr in a:
-            result.append(await getDataArray(attr,current_user))
+            arr = await getDataArray(attr,current_user)
+            if arr:
+                result.append(arr)
+            else:
+                result.append({"attribute_name": attr, "data_array":[] })
+                
     return {"data": result}
-
 
 
 @app.post("/set")
 async def setData(attribute_name: Annotated[str, Form()], datapoint:Annotated[Any, Form()], current_user: Annotated[User, Depends(get_current_active_user)]):
+    print(attribute_name, current_user, datapoint)
     await setDatapoint(attribute_name, current_user, datapoint)
