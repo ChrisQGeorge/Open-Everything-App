@@ -14,13 +14,12 @@ const blankUser = {
   'settings':[""]
 }
 
-const sampleCatagories = [
-  {category:"Health", icon:"UilHeart", color:"text-[#fcba03]"},
-  {category:"Body", icon:"UilWeight",color:"text-[blue]"},
-  {category:"Food",icon:"UilPizzaSlice",color:"text-[green]"},
-  {category:"Fitness",icon:"UilDumbbell",color:"text-[violet]"},
-  {category:"Productivity",icon:"UilClock",color:"text-[black]"},
-]
+
+interface CategoriesInterface {
+  category: string;
+  icon: string; 
+  color: string;
+}
 
 
 const Dashboard = () =>  {
@@ -32,7 +31,7 @@ const Dashboard = () =>  {
   const [attrArray, setAttrArray] = useState<AttributeData[]>([]);
   const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
   const [currentCategory, setCategory] = useState("default");
-  const [categories, setCategoryList] = useState(sampleCatagories);
+  const [categories, setCategoryList] = useState<CategoriesInterface[]>([]);
   const router = useRouter(); // Initialize useRouter
   const token = Cookie.get("token") || null
 
@@ -45,8 +44,14 @@ const Dashboard = () =>  {
           setUser(res.data)
 
           if(res.data.attributes){
+            
             setAttributes(res.data.attributes)
-            loadAttributes()
+              if (res.data.categories){
+                setCategoryList(res.data.categories)
+                
+                setCategory(categories[0]?.category || "default")
+              }
+            await loadAttributes()
           }
       }
       getData();
@@ -72,31 +77,12 @@ const Dashboard = () =>  {
     router.push("/")
   });
 
-  /*const getData = async (attribute: string) => {
 
-    const response = await  fetch('/api/get/'+attribute, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-
-        method: "GET",
-    });
-
-    if(response.ok){
-      const data = await response.json()
-      if(data.data_array){
-        return {attribute: data.data_array}
-      } else {
-        return {attribute: null}
-      }
-
-
-    }*/
   
   const loadAttributes = async () => {
       const queryParams = new URLSearchParams();
       for (let attribute of attributes) {
-          queryParams.append('a', attribute);
+          queryParams.append('a', attribute.attribute_name);
       }
       const response = await fetch('/api/getMany?' + queryParams.toString(), {
           headers: {
@@ -108,6 +94,7 @@ const Dashboard = () =>  {
       if (response.ok) {
           const data = await response.json();
           if (data.data) {
+            console.log(data.data)
               setAttrArray(data.data);
           }
       }
@@ -175,10 +162,12 @@ const CatNav: React.FC<CatNavProps> = ({ catList, currCat, loadCat, createCatego
         {catList.map((data: CategoryData) => {
           const IconComp = Unicons[data.icon];
           const trStyles = "rounded w-full font-semibold cursor-pointer " + ((currentCategory == data.category) ? "bg-gray-400 bg-opacity-40" : "")
+          const tdStyle = {color:data.color}
 
+          
           return(
             <tr id= {data.category} key={"category"+data.category} className={trStyles}  onClick ={() => handleSelect(data.category)}>
-              <td className = {data.color}>
+              <td style={tdStyle}>
                 <IconComp />
               </td>
               <td className="pl-4 text-lg">
@@ -225,32 +214,90 @@ const PageNav = (props: any) => {
 
 
 interface AttributeData {
-  attr_name: string;
+  
+  attribute_name: string;
   data_array: any[]; // Replace 'any' with a more specific type if possible
-  id: string; // Assuming each item has an 'id' for the key prop
 }
 
 interface AttributesTableProps {
   attrs: AttributeData[];
 }
+
+
 const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
+  const [showPopup, setPopup] = useState("");
+  const [dataPoint, setDatapoint] = useState("");
+  const token = Cookie.get("token") || null
+
+  const closePopup= () => {
+    setPopup("")
+  }
+
+  const handleSetDatapoint= async (attribute:AttributeData, datapoint:any) => {
+    const formData = new FormData()
+
+    formData.append("datapoint", dataPoint)
+    formData.append("attribute_name", attribute.attribute_name)
+    const response = await fetch('/api/set', {  
+      body: formData,
+      headers: {
+          'Authorization': `Bearer ${token}`
+      },
+      method: "POST",
+  });
+
+    if (response.ok) {
+      closePopup()
+    }else{
+      console.log("ERROR: "+response)
+    }
+};
+
   return (
   <div className="min-h-full h-auto rounded-xl bg-gray-200 bg-opacity-80 box-border p-4" >
     <table className="w-full p-0">
-        {attrs.map((dataArray: AttributeData) => (
-          <tr className="border-b-[10px] border-transparent"key={"datapoint"+String(dataArray.attr_name)}>
+        {attrs.map((attribute: AttributeData) => (
+          <tr className="border-b-[10px] border-transparent"key={"datapoint"+String(attribute.attribute_name)}>
             <td className="text-xl font-semibold float-left">
-              {String(dataArray.attr_name)}
+              {String(attribute.attribute_name)}
+
             </td>
             <td className="text-xl font-medium float-right">
-              <input></input>{dataArray.data_array.length > 0 ? JSON.parse(dataArray.data_array[dataArray.data_array.length - 1].data) : 'Enter Value'}
+            <button onClick={() => setPopup(attribute.attribute_name)}>{attribute.data_array && attribute.data_array.length > 0 ? attribute.data_array[attribute.data_array.length - 1].data : "Enter Data"}</button>
+            {showPopup == attribute.attribute_name ? (
+              <div key = {attribute.attribute_name} id ={"popup"+attribute.attribute_name} className="absolute w-full h-full bg-gray-400 bg-opacity-30 m-0 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+              <div className="w-auto min-w-[300px] h-auto min-h-[200px] rounded-xl bg-gray-200 bg-opacity-90 justify-center">
+                  <h1>{attribute.attribute_name}</h1>
+                <form onSubmit={()=>handleSetDatapoint(attribute, dataPoint)}>
+                  <div>
+                    <input 
+                      onChange={(e) => setDatapoint(e.target.value)}
+                      value={dataPoint}></input>
+                  </div>
+                  <div className="inline-block">
+                    <button 
+                      className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-[49%] float-right"
+                      type="submit"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-[49%] float-left"
+                      onClick={()=>closePopup()}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            ) : ""}
             </td>
           </tr>
             ))}
     </table>
   </div>
   )
-
 }
 
 export default Dashboard;
