@@ -21,13 +21,28 @@ interface CategoriesInterface {
   color: string;
 }
 
+interface AttributeData {
+  
+  attribute_name: string;
+  data_array: any[]; // Replace 'any' with a more specific type if possible
+}
+
+interface AttributesTableProps {
+  attrs: AttributeData[];
+}
+
+interface UserAttribute{
+  attribute_name:string
+   datatype:string
+   category:string
+}
 
 const Dashboard = () =>  {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [render, renderPage] = useState(false);
   const [user, setUser] = useState(blankUser)
-  const [attributes, setAttributes] = useState([])
+  const [attributes, setAttributes] = useState< UserAttribute[]>([])
   const [attrArray, setAttrArray] = useState<AttributeData[]>([]);
   const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
   const [currentCategory, setCategory] = useState("default");
@@ -41,17 +56,17 @@ const Dashboard = () =>  {
           setMessage(res.message || '');
           setLoading(false);
           setStatus(res.status);
-          setUser(res.data)
+          setUser(res.data);
 
           if(res.data.attributes){
             
-            setAttributes(res.data.attributes)
+            setAttributes(res.data.attributes);
               if (res.data.categories){
-                setCategoryList(res.data.categories)
+                setCategoryList(res.data.categories);
                 
-                setCategory(categories[0]?.category || "default")
+                setCategory(categories[0]?.category || "default");
               }
-            await loadAttributes()
+            await loadAttributes();
           }
       }
       getData();
@@ -74,15 +89,21 @@ const Dashboard = () =>  {
 
   const logout = (() => {
     Cookie.remove('token');
-    router.push("/")
+    router.push("/");
   });
+
+  useEffect (() => {
+    loadAttributes()
+  },[status, currentCategory] );
 
 
   
   const loadAttributes = async () => {
       const queryParams = new URLSearchParams();
       for (let attribute of attributes) {
+        if (attribute.category == currentCategory){
           queryParams.append('a', attribute.attribute_name);
+        }
       }
       const response = await fetch('/api/getMany?' + queryParams.toString(), {
           headers: {
@@ -211,18 +232,6 @@ const PageNav = (props: any) => {
 
   )
 }
-
-
-interface AttributeData {
-  
-  attribute_name: string;
-  data_array: any[]; // Replace 'any' with a more specific type if possible
-}
-
-interface AttributesTableProps {
-  attrs: AttributeData[];
-}
-
 
 const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
   const [showPopup, setPopup] = useState("");
