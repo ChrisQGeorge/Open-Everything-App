@@ -180,3 +180,6 @@ bower_components
 *.swo
 *.sublime-workspace
 *.sublime-project
+
+#database data
+db/data/
