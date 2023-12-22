@@ -29,6 +29,8 @@ interface AttributeData {
 
 interface AttributesTableProps {
   attrs: AttributeData[];
+  category:string;
+  reloadAttr:()=>void;
 }
 
 interface UserAttribute{
@@ -44,10 +46,10 @@ const Dashboard = () =>  {
   const [user, setUser] = useState(blankUser)
   const [attributes, setAttributes] = useState< UserAttribute[]>([])
   const [attrArray, setAttrArray] = useState<AttributeData[]>([]);
-  const [status, setStatus] = useState(100); // Changed from setstatus to setStatus for naming convention
+  const [status, setStatus] = useState(100);
   const [currentCategory, setCategory] = useState("default");
   const [categories, setCategoryList] = useState<CategoriesInterface[]>([]);
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
   const token = Cookie.get("token") || null
 
   useEffect(() => {
@@ -140,7 +142,7 @@ const Dashboard = () =>  {
               >Logout</button>
             </div>
             <div className="w-[67%] h-full overflow-auto m-0 float-left box-border">
-              <AttributesTable attrs={attrArray}/>
+              <AttributesTable category = {currentCategory} attrs={attrArray} reloadAttr={loadAttributes}/>
             </div>
           </div>
         </div>
@@ -180,29 +182,31 @@ const CatNav: React.FC<CatNavProps> = ({ catList, currCat, loadCat, createCatego
   return (
     <div className=" min-h-[33%] h-auto p-4 w-full mb-4 box-border rounded-xl bg-gray-200 bg-opacity-80 m-0">
       <table className="w-full">
-        {catList.map((data: CategoryData) => {
-          const IconComp = Unicons[data.icon];
-          const trStyles = "rounded w-full font-semibold cursor-pointer " + ((currentCategory == data.category) ? "bg-gray-400 bg-opacity-40" : "")
-          const tdStyle = {color:data.color}
+        <tbody>
+          {catList.map((data: CategoryData) => {
+            const IconComp = Unicons[data.icon];
+            const trStyles = "rounded w-full font-semibold cursor-pointer " + ((currentCategory == data.category) ? "bg-gray-400 bg-opacity-40" : "")
+            const tdStyle = {color:data.color}
 
-          
-          return(
-            <tr id= {data.category} key={"category"+data.category} className={trStyles}  onClick ={() => handleSelect(data.category)}>
-              <td style={tdStyle}>
-                <IconComp />
-              </td>
-              <td className="pl-4 text-lg">
-                {data.category}
-              </td>
-            </tr>
-          )
-        })}
-        <tr className="cursor-pointer font-semibold" onClick={() => createCategory()}>
-          <td><Unicons.UilPlus /></td>
-          <td className="pl-4">
-            <button className="text-lg">Add More</button>
-          </td>
-        </tr>
+            
+            return(
+              <tr id= {data.category} key={"category"+data.category} className={trStyles}  onClick ={() => handleSelect(data.category)}>
+                <td style={tdStyle}>
+                  <IconComp />
+                </td>
+                <td className="pl-4 text-lg">
+                  {data.category}
+                </td>
+              </tr>
+            )
+          })}
+          <tr className="cursor-pointer font-semibold" onClick={() => createCategory()}>
+            <td><Unicons.UilPlus /></td>
+            <td className="pl-4">
+              <button className="text-lg">Add More</button>
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
 
@@ -218,31 +222,44 @@ const PageNav = (props: any) => {
   return (
     <div className="min-h-[33%] p-4 w-full box-border box-border w-full rounded-xl bg-gray-200 m-0 bg-opacity-80">
       <table> 
-        <tr>
-          <td onClick = {() => handleNav("test")}>
+        <tbody>
+          <tr>
+            <td onClick = {() => handleNav("test")}>
 
-          </td>
-          <td>
+            </td>
+            <td>
 
-          </td>
-        </tr>
-
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
 
   )
 }
 
-const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
-  const [showPopup, setPopup] = useState("");
+const AttributesTable: React.FC<AttributesTableProps> = ({ attrs, category, reloadAttr }) => {
+  const [showDataPopup, setDataPopup] = useState("");
+  const [showAddAttrPopup, setAddAttrPopup] = useState(false)
   const [dataPoint, setDatapoint] = useState("");
+  const router = useRouter();
+
+
+  //newAttribute Fields
+  const [newAttributeName,     setAttributeName] = useState("");
+  const [newAttributeDatatype, setAttributeDatatype] = useState("");
+  const [newAttributeWidget,   setAttributeWidget] = useState("");
+  
   const token = Cookie.get("token") || null
 
-  const closePopup= () => {
-    setPopup("")
+  
+
+  const closeDataPopup= () => {
+    setDataPopup("")
   }
 
-  const handleSetDatapoint= async (attribute:AttributeData, datapoint:any) => {
+  const handleSetDatapoint= async (attribute:AttributeData, datapoint:any, event: React.FormEvent<HTMLFormElement>, ) => {
+    event.preventDefault();
     const formData = new FormData()
 
     formData.append("datapoint", dataPoint)
@@ -256,15 +273,43 @@ const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
   });
 
     if (response.ok) {
-      closePopup()
+      closeDataPopup()
     }else{
       console.log("ERROR: "+response)
     }
-};
+  };
+
+
+  const handleNewAttribute = async (event: React.FormEvent<HTMLFormElement>) =>{
+    event.preventDefault();
+    const formData = new FormData()
+    formData.append('attribute_name', newAttributeName)
+    formData.append('datatype', newAttributeDatatype)
+    formData.append('category', category)  
+    formData.append('widget', newAttributeWidget)
+
+    const response = await fetch("/api/users/newAttribute", {  
+      body: formData,
+      headers: {
+          'Authorization': `Bearer ${token}`
+      },
+      method: "POST",
+  });
+  
+    if (response.ok) {
+      setAddAttrPopup(false)
+      reloadAttr()
+      router.refresh()
+    }else{
+      console.log("ERROR: ")
+      console.log(response)
+    }
+  }
 
   return (
   <div className="min-h-full h-auto rounded-xl bg-gray-200 bg-opacity-80 box-border p-4" >
     <table className="w-full p-0">
+      <tbody>
         {attrs.map((attribute: AttributeData) => (
           <tr className="border-b-[10px] border-transparent"key={"datapoint"+String(attribute.attribute_name)}>
             <td className="text-xl font-semibold float-left">
@@ -272,12 +317,12 @@ const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
 
             </td>
             <td className="text-xl font-medium float-right">
-            <button onClick={() => setPopup(attribute.attribute_name)}>{attribute.data_array && attribute.data_array.length > 0 ? attribute.data_array[attribute.data_array.length - 1].data : "Enter Data"}</button>
-            {showPopup == attribute.attribute_name ? (
+            <button onClick={() => setDataPopup(attribute.attribute_name)}>{attribute.data_array && attribute.data_array.length > 0 ? attribute.data_array[attribute.data_array.length - 1].data : "Enter Data"}</button>
+            {showDataPopup == attribute.attribute_name ? (
               <div key = {attribute.attribute_name} id ={"popup"+attribute.attribute_name} className="absolute w-full h-full bg-gray-400 bg-opacity-30 m-0 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
               <div className="w-auto min-w-[300px] h-auto min-h-[200px] rounded-xl bg-gray-200 bg-opacity-90 justify-center">
                   <h1>{attribute.attribute_name}</h1>
-                <form onSubmit={()=>handleSetDatapoint(attribute, dataPoint)}>
+                <form onSubmit={(event)=>handleSetDatapoint(attribute, dataPoint, event)}>
                   <div>
                     <input 
                       onChange={(e) => setDatapoint(e.target.value)}
@@ -292,7 +337,7 @@ const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
                     </button>
                     <button 
                       className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-[49%] float-left"
-                      onClick={()=>closePopup()}
+                      onClick={()=>closeDataPopup()}
                     >
                       Close
                     </button>
@@ -304,6 +349,59 @@ const AttributesTable: React.FC<AttributesTableProps> = ({ attrs }) => {
             </td>
           </tr>
             ))}
+          <tr>
+            <td>
+              <button className="w-full" onClick={()=>setAddAttrPopup(true)}>
+                Add Attribute
+              </button>
+              {showAddAttrPopup == true ? (
+                <div className="absolute w-full h-full bg-gray-400 bg-opacity-30 m-0 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                <div className="w-auto min-w-[300px] h-auto min-h-[200px] rounded-xl bg-gray-200 bg-opacity-90 justify-center">
+                  
+                  <form onSubmit={(event)=>handleNewAttribute(event, )}>
+                    <table>
+                      <tbody>
+                        <tr>
+                          <td>Attribute Name</td>
+                          <td><input onChange={(e) => setAttributeName(e.target.value)} value={newAttributeName}></input></td>
+                        </tr>
+
+                        <tr>
+                          <td>Datatype</td>
+                          <td><input onChange={(e) => setAttributeDatatype(e.target.value)} value={newAttributeDatatype}></input></td>
+                        </tr>
+                        <tr>
+                          <td>Widget</td>
+                          <td><input onChange={(e) => setAttributeWidget(e.target.value)} value={newAttributeWidget}></input></td>
+                        </tr>
+                      
+                        <tr>
+                          <td>
+                            <button 
+                              className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-[49%] float-right"
+                              type="submit"
+                            >
+                              Save
+                            </button>
+                          </td>
+                          <td>
+                            <button 
+                              className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-[49%] float-left"
+                              onClick={()=>setAddAttrPopup(false)}
+                            >Close
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                      
+                    </table>
+                  </form>
+                </div>
+              </div>
+              ) : ""}
+            </td>
+          </tr>
+        </tbody>
     </table>
   </div>
   )
