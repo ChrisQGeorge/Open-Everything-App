@@ -309,10 +309,10 @@ async def register(username, password, email):
                         {'category':"productivity", 'icon':"UilClock"     , 'color':"black"  },
                     ],
                     'attributes':[
-                        {'attribute_name':'weight' ,'datatype':'float'  ,'category':'body'  },
-                        {'attribute_name':'age'    ,'datatype':'int'    ,'category':'basic' },
-                        {'attribute_name':'mood'   ,'datatype':'int'    ,'category':'mental'},
-                        {'attribute_name':'journal','datatype':'journal','category':'mental'}
+                        {'attribute_name':'weight' ,'datatype':'float'  ,'category':'body'  ,'widget':'int-decgood'},
+                        {'attribute_name':'age'    ,'datatype':'int'    ,'category':'basic' ,'widget':'int'},
+                        {'attribute_name':'mood'   ,'datatype':'int'    ,'category':'mental','widget':'scale-ten'},
+                        {'attribute_name':'journal','datatype':'journal','category':'mental','widget':'text-long'}
                     ],
                     'settings':[]
                     })
@@ -370,7 +370,7 @@ async def setDatapoint(attributeName, user, data):
     global dataClient
     dataCol = dataClient.collection
 
-    datapoint = {"timestamp":datetime.now(), "data":data}
+    #datapoint = {"timestamp":datetime.now(), "data":data}
 
     res = cursorToDict(dataCol.find_one({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]}))
 
@@ -403,6 +403,21 @@ async def setDatapoint(attributeName, user, data):
         }
     )
 
+
+#-----User Functions-----#
+
+async def setUserAttribute(attribute_name, datatype, category, widget, current_user):
+    global userClient
+    userCol = userClient.collection
+    if any(attribute_name in d for d in current_user["attributes"]):
+        raise HTTPException(
+            status_code = 409,
+            detail = "Attribute already exists"
+        )
+    userCol.update_one(
+        {'username':current_user["username"]},
+        {'$push': {'attributes': {'attribute_name':attribute_name,'datatype':datatype,'category':category,'widget':widget}}}
+    )
 
 #-----API endpoints-----#
     
@@ -473,8 +488,11 @@ async def set_root_password(password: str = Form(...)):
 async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
     return current_user
 
+#User Attributes CRUD
+@app.post("/users/newAttribute")
+async def newAttribute(attribute_name: Annotated[str, Form()], datatype:Annotated[str, Form()], category:Annotated[str, Form()], widget:Annotated[str, Form()],current_user: Annotated[User, Depends(get_current_active_user)]):
 
-
+    await setUserAttribute(attribute_name, datatype, category, widget, current_user)
 
 #Data routes
 @app.get("/get/{attrName}",response_model=Union[DataArray, ErrorResponse])
