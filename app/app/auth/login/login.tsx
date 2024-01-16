@@ -1,14 +1,13 @@
+"use client"
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import checkAuth from "../components/checkAuth"
+import { useRouter } from 'next/navigation';
+import checkAuth from "../../components/checkAuth"
 import Cookie from 'js-cookie';
 import Link from 'next/link';
 
 export default function Login() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [checkPassword, setCheckPassword] = useState('')
-    const [email, setEmail] = useState('')
     const [errorMessage, setError] = useState('');
     const [render, renderPage] = useState(false);
     const [message, setMessage] = useState("");
@@ -29,11 +28,11 @@ export default function Login() {
     useEffect(() => {
         if (!loading) {
             if (status === 399) {
-                router.push('/setup');
+                router.push('/auth/setup');
             } else if (status === 398) {
-                router.push('/rebuild');
+                router.push('/auth/rebuild');
             } else if (status >= 200 && status < 300) {
-                router.push('/dashboard');
+                router.push('/app/dashboard');
             }
             renderPage(true)
         }
@@ -42,44 +41,7 @@ export default function Login() {
     const handleSubmit = async (event: { preventDefault: () => void; }) => {
         event.preventDefault(); // Prevent the default form submission
 
-        if(password === checkPassword){
-
-            const formData = new URLSearchParams();
-            formData.append('password', password);
-            formData.append('username', username);
-            formData.append('email', email);
-
-
-
-            const response = await fetch('/api/register', {
-                body: formData,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                method: "POST",
-            });
-
-            if(response.ok){
-                const data = await response.json();
-                Cookie.set('token', data.access_token, { expires: 1 });
-                router.push('/dashboard'); // Use router.push to navigate
-            } else if(response.status === 409){
-                setError("Error: Username or email already exists");
-
-            }else{
-
-                setError("Error: Failed to register");
-            }
-        }else{
-            setError("Error: Passwords do not match");
-        }
-
-
-
-
-        /*event.preventDefault(); // Prevent the default form submission
-
-        const response = await fetch('/api/login', {
+        const response = await fetch('/api/token', {
             body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -90,17 +52,17 @@ export default function Login() {
         if(response.ok){
             const data = await response.json();
             Cookie.set('token', data.access_token, { expires: 1 });
-            router.push('/dashboard'); // Use router.push to navigate
+            router.push('/app/dashboard'); // Use router.push to navigate
         } else {
             setError("Error: Failed to log in");
-        }*/
+        }
     };
     if(render){
         return (
             <div className="text-black flex items-center justify-center min-h-screen bg-gray-200">
                 <div className="px-8 py-6 text-left bg-white shadow-lg">
                     <div>
-                        <h3 className="text-2xl font-bold text-center">Register an account</h3>
+                        <h3 className="text-2xl font-bold text-center">Login to your account</h3>
                         <h3 className="text-2xl font-bold text-center">{errorMessage}</h3>
                     </div>
                     <form onSubmit={handleSubmit}>
@@ -114,17 +76,7 @@ export default function Login() {
                                 className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
                             />
                         </div>
-                        <div>
-                            <input 
-                                type="text" 
-                                placeholder="Email" 
-                                id="email"
-                                onChange={(e) => setEmail(e.target.value)}
-                                value={email}
-                                className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
-                            />
-                        </div>
-                        <div>
+                        <div className="mt-4">
                             <input 
                                 type="password" 
                                 placeholder="Password" 
@@ -134,24 +86,14 @@ export default function Login() {
                                 className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
                             />
                         </div>
-                        <div>
-                            <input 
-                                type="password" 
-                                placeholder="Password Again" 
-                                id="checkPassword"
-                                onChange={(e) => setCheckPassword(e.target.value)}
-                                value={checkPassword}
-                                className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
-                            />
-                        </div>
                         <div className="flex flex-col items-center justify-between">
                             <button 
                                 className="px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900 w-full"
                                 type="submit"
                             >
-                                Register
+                                Login
                             </button>
-                            <Link href="/login" className="text-sm text-blue-600 hover:underline mt-4">Login</Link>
+                            <Link href="/auth/register" className="text-sm text-blue-600 hover:underline mt-4">Register</Link>
                         </div>
                     </form>
                 </div>

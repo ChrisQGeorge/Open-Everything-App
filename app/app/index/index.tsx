@@ -1,8 +1,9 @@
+"use client"
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router'; // Import useRouter
+import { useRouter } from 'next/navigation'; // Import useRouter
 import checkAuth from "../components/checkAuth"
 
-export default function Home() {
+export default function Index() {
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(true);
     const [render, renderPage] = useState(false);
@@ -22,13 +23,13 @@ export default function Home() {
     useEffect(() => {
         if (!loading) {
             if (status >= 400 && status < 600) {
-                router.push('/login');
+                router.push('/auth/login');
             } else if (status === 399) {
-                router.push('/setup');
+                router.push('/auth/setup');
             } else if (status === 398) {
-                router.push('/rebuild');
+                router.push('/auth/rebuild');
             } else if (status >= 200 && status < 300) {
-                router.push('/dashboard');
+                router.push('/app/dashboard');
             }
             renderPage(true)
         }

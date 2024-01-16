@@ -1,14 +1,20 @@
-from typing import Annotated, Union
+from typing import Annotated, Union, List, Any, Dict
 import os
-from fastapi import Depends, FastAPI, HTTPException, status, Form
+import bson
+from datetime import datetime
+from fastapi import Depends, FastAPI, HTTPException, status, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from starlette.exceptions import HTTPException
+from fastapi.exceptions import RequestValidationError
+from exception_handlers import request_validation_exception_handler, http_exception_handler, unhandled_exception_handler
 from dbConnection import DB as db
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from authlib.jose import jwt
 from datetime import datetime, timedelta
 import secrets
+from operator import itemgetter
 
 notSetupError = HTTPException(
         status_code = 399,
@@ -16,10 +22,12 @@ notSetupError = HTTPException(
         headers={"WWW-Authenticate": "Bearer"}, 
     )
 
-
 #-----App Setup-----#
 app = FastAPI()
 
+app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 #Restrict IP's to internal docker containers
 origins = [
@@ -37,8 +45,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-class ErrorResponse(BaseModel):
-    detail: str
 
 async def rebuild_db_users(root_pass):
     global dataClient
@@ -49,12 +55,9 @@ async def rebuild_db_users(root_pass):
     
 
     if root.passfail == True:
-        print("Database connected")
         if root.collection.find_one({"user":"api_user"}):
-            print("user found:", root.collection.find_one({"user":"api_user"}))
             root.client.admin.command("updateUser", "api_user", pwd=api_pass)
         else:
-            print("user not found")
             root.client.admin.command("createUser", "api_user",
                 pwd=api_pass,
                 roles=[{"role": "readWrite", "db": os.environ.get('MONGO_DBNAME')}])
@@ -84,21 +87,19 @@ async def configure_db_and_routes():
 
     if not rootClient.passfail:
         os.environ["SETUP"] = "False"
-        print("Not first time setup:")
-    else:
-        print("First Time Setup")
 
 
     if os.environ["SETUP"] == "True":
         await rebuild_db_users(os.environ.get('ROOT_MONGO_PASSWORD'))
 
+    #Connect API users with auto-generated pass
     dataClient = db()
     userClient = db()
     await dataClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'data')
     await userClient.connect(os.environ.get('MONGO_DBNAME'), 'api_user', os.environ.get('API_USER_PASS'), 'users')
     
+
 async def setup(root_password):
-    tempPass = secrets.token_urlsafe(16)
     rootClient = db()
     await rootClient.connect('admin','root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
 
@@ -109,7 +110,7 @@ async def setup(root_password):
             detail = "ERROR: Default pass not working. Something went wrong",
         )
 
-    print(rootClient.client.admin.command("updateUser", "root", pwd=root_password))
+    rootClient.client.admin.command("updateUser", "root", pwd=root_password)
 
     oldRootClient = db()
     await oldRootClient.connect('admin', 'root', os.environ.get('ROOT_MONGO_PASSWORD'), 'system.users')
@@ -128,21 +129,7 @@ async def setup(root_password):
 
     return True
 
-
-#-----Auth Setup-----#
-# using the following pages as a guide 
-# https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
-# https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
-
-#Should generate new JWT token on runtime rather than having to store the token in an open source repo
-SECRET_KEY = secrets.token_urlsafe(32)
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+#-----Models-----#
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -160,11 +147,47 @@ class TokenData(BaseModel):
 class User(BaseModel):
     username: str
     email: str | None = None
+    roles: List[str] | None = None
+    attributes: List[str] | None = None
+    settings: List[str] | None = None
     disabled: bool | None = None
+
 
 
 class UserInDB(User):
     hashed_password: str
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+
+class DataPoint(BaseModel):
+    data: Any
+    timestamp: datetime
+
+    class Config:
+        extra = 'allow'
+
+class DataArray(BaseModel):
+    attr_name: str
+    data_array: List[DataPoint]
+
+
+
+
+#-----Auth-----#
+# using the following pages as a guide 
+# https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/
+# https://www.mongodb.com/developer/languages/python/farm-stack-authentication/
+
+#Should generate new JWT token on runtime rather than having to store the token in an open source repo
+SECRET_KEY = secrets.token_urlsafe(32)
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password, hashed_password):
      return pwd_context.verify(plain_password.encode('utf-8'), hashed_password)
@@ -175,6 +198,7 @@ def get_password_hash(password):
 
 
 def get_user(username: str):
+    global userClient
     col = userClient.collection
 
     return col.find_one({'username':username})
@@ -182,7 +206,6 @@ def get_user(username: str):
 
 def authenticate_user(username: str, password: str):
     user = get_user(username)
-    print(user)
     if not user:
         return False
     if not verify_password(password, user["password_hash"]):
@@ -215,7 +238,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         print("App needs rebuild:")
         raise HTTPException(
             status_code = 398,
-            detail = "App not setup",
+            detail = "App needs to be rebuilt",
             headers={"WWW-Authenticate": "Bearer"}, 
         )
 
@@ -232,12 +255,9 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
             raise credentials_exception
         token_data = TokenData(username=username)
     except Exception as e:
-        print(e)
-        print("Credential exception:")
         raise credentials_exception
     user = get_user(username=token_data.username)
     if user is None:
-        print("Error: User is none")
         raise credentials_exception
     return user
 
@@ -265,16 +285,108 @@ async def register(username, password, email):
     userCol.insert_one({
                     "username":username,
                     "email":email,
+                    "joinDateTime":datetime.now(),
                     'password_hash':get_password_hash(password),
-                    'disabled':False
+                    'disabled':False,
+                    'roles':[],
+                    'attributes':[
+                        'weight',
+                        'age',
+                        'mood',
+                        'journal'
+                    ],
+                    'settings':[]
                     })
     
     return authenticate_user(username, password)
 
+#-----Get data-----#
+async def getDataArray(attributeName, user):
+    global dataClient
+    dataCol = dataClient.collection
+
+    res = dataCol.find({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]})
+
+    if not res:
+        return {"attr_name":attributeName, "data_array":[]}
+
+    resArr = []
+    for doc in res:
+        resArr.append(doc)
+
+    newlist = sorted(resArr, key=itemgetter('startTimeDate')) 
+
+
+    bigArr = []
+
+    for dataArray in newlist:
+        bigArr.extend(dataArray["datapoints"])
+
+    return {"attr_name":attributeName, "data_array":bigArr}
+
+#-----Utility Functions-----#
+def cursorToDict(cursor):
+    if not cursor or isinstance(cursor, dict): return cursor
+ 
+    return dict(zip(zip(*cursor.description)[0], cursor.fetchone()))
+
+
+#-----Set data-----#
+async def createDataAttribute(attributeName, user):
+    global dataClient
+    dataCol = dataClient.collection
+
+
+    doc = dataCol.insert_one({
+            "username":user['username'],
+            "attribute_name":attributeName,
+            "next_document":"",
+            "datapoints":[],
+            "startTimeDate":datetime.now(),
+            "endTimeDate":datetime.now()
+        })
+    return doc.inserted_id
+
+async def setDatapoint(attributeName, user, data):
+    global dataClient
+    dataCol = dataClient.collection
+
+    datapoint = {"timestamp":datetime.now(), "data":data}
+
+    res = cursorToDict(dataCol.find_one({"$and": [{"attribute_name":attributeName}, {"username":user['username']}]}))
+
+    if res:
+        if res['next_document']:
+            while True:
+                res = cursorToDict(dataCol.find_one({"_id":res['next_document']}))
+                
+                if not res['next_document']:
+                    break
+    else:
+        id = await createDataAttribute(attributeName, user)
+        res = cursorToDict(dataCol.find_one({"_id":id}))
+
+    #Create new document and link old document when larger than 10 mb
+
+    #print(res)
+    if len(bson.BSON.encode(res)) > 10000000:
+        id = await createDataAttribute(attributeName, user)
+        id = id
+        dataCol.update({"_id":res['_id']}, {"next_document":id})
+        res = cursorToDict(dataCol.find_one({"_id":id}))
+
+
+    dataCol.update_one(
+        {"_id": res["_id"]},
+        {
+            '$push': {'datapoints': {"timestamp": datetime.now(), "data": data}},
+            '$set': {"endDateTime": datetime.now()}
+        }
+    )
 
 
 #-----API endpoints-----#
-@app.post("/login", response_model=Union[Token, ErrorResponse])
+@app.post("/token", response_model=Union[Token, ErrorResponse])
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ):
@@ -296,14 +408,14 @@ async def login_for_access_token(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @app.post("/register", response_model=Union[Token, ErrorResponse])
 async def register_and_get_token(username: Annotated[str, Form()], password: Annotated[str, Form()], email: Annotated[str, Form()]):
     if os.environ["SETUP"] == "True":
         return notSetupError
-    try:
-        user = await register(username, password, email)
-    except Exception as e:
-        print(e)
+
+    user = await register(username, password, email)
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -321,10 +433,7 @@ async def register_and_get_token(username: Annotated[str, Form()], password: Ann
 async def read_users_me(current_user: Annotated[User, Depends(get_current_active_user)]):
     return current_user
 
-@app.get("/setup/firstTimeStartup")
-async def setup_confirm():
-    return {'data':os.environ["SETUP"]}
-    
+
 @app.post("/setup/setRoot")
 async def set_root_password(password: str = Form(...)):
     if os.environ["SETUP"] != "True":
@@ -335,19 +444,29 @@ async def set_root_password(password: str = Form(...)):
     
     await setup(password)
 
+
 @app.post("/setup/rebuild")
 async def set_root_password(password: str = Form(...)):
     await rebuild_db_users(password)
     
 
-@app.get("/")
-async def read_root(token: Annotated[str, Depends(get_current_active_user)]):
-    data = {}
-    try:
-        data = dataClient.collection.find_one({"_id": 1})
-    except Exception as e:
-        print("Failed to fetch data on /:"+e)
-    if not data:
-       data = {'data':'ERROR'}
-    
-    return {'message':data["message"]}
+@app.get("/get/{attrName}",response_model=Union[DataArray, ErrorResponse])
+async def getData(attrName, current_user: Annotated[User, Depends(get_current_active_user)]):
+
+    dataArr = await getDataArray(attrName,current_user)
+
+    return dataArr
+
+@app.get("/getMany",response_model=Union[dict[str, list[DataArray]], ErrorResponse])
+async def getMuchData( current_user: Annotated[User, Depends(get_current_active_user)], a: Annotated[list[str], Query()] = []):
+    result = []
+    if(a):
+        for attr in a:
+            result.append(await getDataArray(attr,current_user))
+    return {"data": result}
+
+
+
+@app.post("/set")
+async def setData(attribute_name: Annotated[str, Form()], datapoint:Annotated[Any, Form()], current_user: Annotated[User, Depends(get_current_active_user)]):
+    await setDatapoint(attribute_name, current_user, datapoint)

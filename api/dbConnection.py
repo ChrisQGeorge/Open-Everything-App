@@ -18,11 +18,8 @@ class DB:
             self.passfail = True
         except Exception as e:
             self.passfail = False
-            print(uri)
-            print(e)
 
         if self.passfail:
-            print("connected with uri:"+uri)
             self.client = conn
             self.username = username
             self.databaseName = database
@@ -31,11 +28,3 @@ class DB:
             return True
         
         return False
-    async def changePass(self, newPass, adminClient):
-        
-        response = adminClient.admin.command("updateUser", self.username, pwd=newPass)
-
-        print("Change pass response: " + str(response))
-        time.sleep(3)
-
-        await self.connect(self.databaseName, self.username, newPass, self.collectionName )
