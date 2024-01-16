@@ -1,6 +1,8 @@
 # Open-Everything-App
 A quantified self data aggregator, analyzer, and dashboard that is open source and self-hostable.
 Currently WIP
+# Requiremennts
+To run this application, you must have Docker installed
 
 # Running
 To run the application, clone the git repository and run the following command
