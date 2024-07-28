@@ -7,7 +7,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: CHANGEME
       MONGO_INITDB_DATABASE: MongoDB
     volumes:
-      - db-data:/data/db
+      - ./db-data:/data/db
     networks:
       - app-net
 
@@ -21,6 +21,12 @@ services:
       MONGO_DBNAME: MongoDB
     networks:
       - app-net
+    develop:
+      watch:
+      - action: rebuild
+        path: ./api
+        target: /api
+
 
   web:
     build: ./app
@@ -30,6 +36,11 @@ services:
       - api
     networks:
       - app-net
+    develop:
+      watch:
+      - action: sync
+        path: ./app
+        target: /app
     
 networks:
   app-net:
