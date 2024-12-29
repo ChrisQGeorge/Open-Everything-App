@@ -1,30 +1,41 @@
-from pymongo import MongoClient
+import mysql.connector
 import time
 
 class DB:
-    client = None
-    db = None
-    collection = None
-    passfail = None
-    username = None
-    databaseName = None
-    collectionName = None
+    def __init__(self):
+        self.connection = None
+        self.cursor = None
+        self.passfail = None
+        self.username = None
+        self.databaseName = None
 
-    async def connect(self, database, username, password, collection):
-        uri = f"mongodb://{username}:{password}@db:27017/{database}?authSource=admin"
-        conn = MongoClient(uri)
+    async def connect(self, database, username, password, host="db", port=3306):
+        """
+        Connect to the MySQL database. 
+        :param database: Name of the database to connect to
+        :param username: MySQL username
+        :param password: MySQL password
+        :param host:     Hostname of the DB container or server (default "db")
+        :param port:     Port number for MySQL (default 3306)
+        """
         try:
-            conn.server_info()
-            self.passfail = True
-        except Exception as e:
-            self.passfail = False
+            self.connection = mysql.connector.connect(
+                host=host,
+                port=port,
+                user=username,
+                password=password,
+                database=database
+            )
+            # Dict cursor so we get results as dictionaries
+            self.cursor = self.connection.cursor(dictionary=True)
 
-        if self.passfail:
-            self.client = conn
+            # If we've made it this far, connection is successful
+            self.passfail = True
             self.username = username
             self.databaseName = database
-            self.db = self.client[database]
-            self.collection = self.db[collection]
             return True
         
-        return False
+        except Exception as e:
+            print(f"Connection error: {e}")
+            self.passfail = False
+            return False

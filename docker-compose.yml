@@ -1,15 +1,27 @@
-version: '3.8'
 services:
   db:
-    image: mongo
+    #build existing mysql image from dockerhub
+    image: mysql
+    ports:
+      #- 33060:33060
+      - 3306:3306
+      #- 3307:3306
+      #Note: inner port should be 3306 and outer port can be mapped to any port
+      #Ex: - Outer:Inner
+      #Ex: - 3307:3306
+
+    restart: unless-stopped
+
+    #Environment variables are set from .env file
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: CHANGEME
-      MONGO_INITDB_DATABASE: MongoDB
-    volumes:
-      - db-data:/data/db
+      MYSQL_ROOT_PASSWORD: mysqlpassADAD12
+      MYSQL_AUTHENTICATION_PLUGIN: mysql_native_password
+      
     networks:
       - app-net
+
+    volumes:
+      - ./db/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:rw
 
   api:
     build: ./api
@@ -17,17 +29,30 @@ services:
       - db
     environment:
       MONGO_USERNAME: root
-      ROOT_MONGO_PASSWORD: CHANGEME
-      MONGO_DBNAME: MongoDB
+      ROOT_MONGO_PASSWORD: mysqlpassADAD12
+      MONGO_DBNAME: main
     networks:
       - app-net
 
   web:
     build: ./app
-    ports:
-      - "3000:3000"
     depends_on:
       - api
+    networks:
+      - app-net
+
+  nginx:
+    image: nginx:alpine
+    depends_on:
+      - web
+      - api
+    ports:
+      - "3000:80"
+    
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+
+
     networks:
       - app-net
     
